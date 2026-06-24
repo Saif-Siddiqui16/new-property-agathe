@@ -25,8 +25,9 @@ export const OwnerSelector = ({ value, onOwnerChange }) => {
         onOwnerChange(e.target.value);
     };
 
-    // If the user is a coworker, or if the client wants owners hidden entirely, don't render it at all.
-    if (user.role !== 'ADMIN') return null;
+    // The client requested that the "Owners" section and the "Global View" selector
+    // be entirely removed/hidden from the PMS.
+    return null;
 
     return (
         <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 min-w-[240px]">

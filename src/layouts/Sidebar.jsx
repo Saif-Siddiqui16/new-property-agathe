@@ -72,12 +72,12 @@ const NAV_ITEMS = [
     tKey: "sidebar.shuttle",
     path: "/shuttle"
   },
-  {
-    icon: Landmark,
-    label: "Owners",
-    tKey: "sidebar.owners",
-    path: "/owners"
-  },
+    // {
+    //   icon: Landmark,
+    //   label: "Owners",
+    //   tKey: "sidebar.owners",
+    //   path: "/owners"
+    // },
   {
     icon: FileText,
     label: "Leases",
@@ -409,6 +409,9 @@ export const Sidebar = ({ isOpen, onClose }) => {
             const canUserView = (navItem) => {
               const selectedProperty = localStorage.getItem('selectedProperty') || 'masteko';
               if (selectedProperty === 'stagathe' && navItem.label === 'Shuttle Management') {
+                return false;
+              }
+              if (selectedProperty === 'stagathe' && navItem.label === 'Team Access Control') {
                 return false;
               }
 

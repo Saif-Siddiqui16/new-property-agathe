@@ -36,10 +36,10 @@ export const SelectProperty = () => {
               <Building2 size={32} />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors">
-              Masteko
+              Mont-Tremblant
             </h2>
             <p className="text-slate-400 mb-6 leading-relaxed">
-              Manage the Masteko / Mont-Tremblant property environment, tenants, leases, and shuttle services.
+              Manage the Mont-Tremblant property environment, tenants, leases, and shuttle services.
             </p>
             <div className="flex items-center text-blue-400 font-bold text-sm">
               Enter Dashboard

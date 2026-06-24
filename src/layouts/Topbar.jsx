@@ -79,7 +79,7 @@ export const Topbar = ({ title = 'Overview', onMenuClick }) => {
                         onChange={handlePropertyChange}
                         className="ml-4 h-9 px-3 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-slate-50 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-all cursor-pointer"
                     >
-                        <option value="masteko">Masteko</option>
+                        <option value="masteko">Mont-Tremblant</option>
                         <option value="stagathe">St-Agathe</option>
                     </select>
                 </div>

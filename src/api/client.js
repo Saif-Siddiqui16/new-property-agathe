@@ -26,6 +26,12 @@ api.interceptors.request.use(
             backendUrl = 'https://saif-property2-client-railway-production.up.railway.app';
         }
 
+        // FORCE CENTRALIZED PERMISSIONS: 
+        // Always fetch permissions from Masteko backend, regardless of which property is selected
+        if (config.url && config.url.includes('/my-permissions')) {
+            backendUrl = 'https://saif-property-client-railway-production.up.railway.app';
+        }
+
         config.baseURL = backendUrl;
 
         const token = localStorage.getItem('accessToken');

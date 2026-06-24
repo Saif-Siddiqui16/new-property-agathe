@@ -67,6 +67,18 @@ const UnitPrepDashboard = () => {
         }
     };
 
+    const overrideStage = async (unitId) => {
+        if (!window.confirm("Are you sure you want to bypass the blocking tickets and move this unit to Cleaning?")) return;
+        try {
+            const res = await api.put(`/api/admin/workflow/unit-prep/${unitId}/override`);
+            if (res.data.success) {
+                fetchPrepUnits();
+            }
+        } catch (error) {
+            alert(error.response?.data?.message || 'Error overriding stage');
+        }
+    };
+
     const calculateStats = (data) => {
         const s = { pending: 0, readyCleaning: 0, cleaningInProgress: 0, cleaningCompleted: 0, unitReady: 0 };
         data.forEach(item => {
@@ -177,6 +189,14 @@ const UnitPrepDashboard = () => {
                                 item.current_stage === 'CLEANING_COMPLETED' ? 'Mark Unit Ready' : 'Unit Ready'}
                 <ArrowRight size={14} />
             </button>
+            {item.hasRequiredTickets && (
+                <button
+                    onClick={() => overrideStage(item.id)}
+                    className="w-full mt-2 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 bg-red-50 text-red-600 border border-red-100 hover:bg-red-100"
+                >
+                    Bypass Tickets
+                </button>
+            )}
         </div>
     );
 

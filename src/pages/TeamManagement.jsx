@@ -334,6 +334,24 @@ export const TeamManagement = () => {
     }
   };
 
+  const selectedProperty = localStorage.getItem('selectedProperty') || 'masteko';
+
+  if (selectedProperty === 'stagathe') {
+      return (
+          <MainLayout title={t('sidebar.team')}>
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center max-w-2xl mx-auto">
+                  <div className="w-20 h-20 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mb-6">
+                      <Shield size={40} />
+                  </div>
+                  <h2 className="text-3xl font-black text-slate-800 mb-4">Centralized Access Control</h2>
+                  <p className="text-lg text-slate-500 mb-8 leading-relaxed">
+                      Team Management has been centralized. To invite new team members or manage granular permissions, please switch to the <strong>Mont-Tremblant</strong> property using the dropdown menu above.
+                  </p>
+              </div>
+          </MainLayout>
+      );
+  }
+
   return (
     <MainLayout title={t('sidebar.team')}>
       <div className="flex flex-col gap-8">
