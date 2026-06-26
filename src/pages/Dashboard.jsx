@@ -36,65 +36,64 @@ import { OwnerSelector } from '../components/OwnerSelector';
 
 export const Dashboard = () => {
     const [__forceUpdate, __setForceUpdate] = useState(0);
+
+    // Track whether permissions have been confirmed by the first sync event.
+    // Before the first 'permissionsUpdated' event, we show a spinner instead of
+    // Access Denied — this prevents the false 'restricted' flash on property switch.
+    const [permissionsSynced, setPermissionsSynced] = useState(() => {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            return user.role === 'ADMIN'; // ADMIN always synced immediately
+        } catch { return false; }
+    });
+
     useEffect(() => {
-        const handleUpdate = () => __setForceUpdate(p => p + 1);
+        const handleUpdate = () => {
+            __setForceUpdate(p => p + 1);
+            setPermissionsSynced(true); // permissions are now confirmed
+        };
         window.addEventListener('permissionsUpdated', handleUpdate);
         return () => window.removeEventListener('permissionsUpdated', handleUpdate);
     }, []);
+
+    // All hooks must be declared before any early return (React rules of hooks)
+    const [stats, setStats] = useState(null);
+    const [revenueStats, setRevenueStats] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [selectedOwnerId, setSelectedOwnerId] = useState('');
+    const [leaseAlertPage, setLeaseAlertPage] = useState(1);
+    const [reservedUnitPage, setReservedUnitPage] = useState(1);
+    const leaseAlertsPerPage = 5;
+    const reservedUnitsPerPage = 5;
+
+    const fetchStats = async (ownerId = '') => {
+        try {
+            setLoading(true);
+            const ownerParam = ownerId ? `?ownerId=${ownerId}` : '';
+            const [dashRes, revRes] = await Promise.all([
+                api.get(`/api/admin/dashboard/stats${ownerParam}`),
+                api.get(`/api/admin/analytics/revenue${ownerParam}`)
+            ]);
+            setStats(dashRes.data);
+            setRevenueStats(revRes.data);
+        } catch (error) {
+            console.error('Failed to fetch dashboard stats', error);
+            setStats(null);
+            setRevenueStats(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchStats(selectedOwnerId);
+    }, [selectedOwnerId]);
 
     const canViewAnyDashboard = hasPermission('Dashboard', 'view') || 
                                hasPermission('Overview', 'view') || 
                                hasPermission('Vacancy Dashboard', 'view') || 
                                hasPermission('Revenue Dashboard', 'view');
 
-    if (!canViewAnyDashboard) {
-      return (
-        <MainLayout title="Access Denied">
-          <div className="flex flex-col items-center justify-center min-h-[400px] bg-white rounded-[32px] border border-slate-100 shadow-2xl p-16 text-center">
-            <div className="w-20 h-20 bg-rose-50 rounded-3xl flex items-center justify-center text-rose-500 mb-6 shadow-xl shadow-rose-100/50">
-              <ShieldAlert size={40} />
-            </div>
-            <h2 className="text-3xl font-black text-slate-800 mb-3 tracking-tight uppercase italic">Access Restricted</h2>
-            <p className="text-slate-500 max-w-sm mx-auto font-medium leading-relaxed">
-              You do not have the necessary permissions to view the unified Dashboard. Please contact your property administrator.
-            </p>
-          </div>
-        </MainLayout>
-      );
-    }
-
-  const [stats, setStats] = useState(null);
-  const [revenueStats, setRevenueStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedOwnerId, setSelectedOwnerId] = useState('');
-  const [leaseAlertPage, setLeaseAlertPage] = useState(1);
-  const [reservedUnitPage, setReservedUnitPage] = useState(1);
-  const leaseAlertsPerPage = 5;
-  const reservedUnitsPerPage = 5;
-
-
-  const fetchStats = async (ownerId = '') => {
-    try {
-      setLoading(true);
-      const ownerParam = ownerId ? `?ownerId=${ownerId}` : '';
-      const [dashRes, revRes] = await Promise.all([
-        api.get(`/api/admin/dashboard/stats${ownerParam}`),
-        api.get(`/api/admin/analytics/revenue${ownerParam}`)
-      ]);
-      setStats(dashRes.data);
-      setRevenueStats(revRes.data);
-    } catch (error) {
-      console.error('Failed to fetch dashboard stats', error);
-      setStats(null);
-      setRevenueStats(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchStats(selectedOwnerId);
-  }, [selectedOwnerId]);
 
   const handleCancelRefund = async (tenantId, unitId) => {
     if (!window.confirm('Are you sure you want to cancel the refund process for this tenant?')) return;
@@ -202,7 +201,26 @@ export const Dashboard = () => {
   };
 
   return (
-    <MainLayout title="Dashboard Overview">
+    <MainLayout title={canViewAnyDashboard ? "Dashboard Overview" : "Dashboard"}>
+      {/* Show spinner until permissions are confirmed — never show Access Denied prematurely */}
+      {!permissionsSynced ? (
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
+            <p className="text-sm text-slate-400 font-medium tracking-wide">Loading dashboard...</p>
+          </div>
+        </div>
+      ) : !canViewAnyDashboard ? (
+        <div className="flex flex-col items-center justify-center min-h-[400px] bg-white rounded-[32px] border border-slate-100 shadow-2xl p-16 text-center">
+          <div className="w-20 h-20 bg-rose-50 rounded-3xl flex items-center justify-center text-rose-500 mb-6 shadow-xl shadow-rose-100/50">
+            <ShieldAlert size={40} />
+          </div>
+          <h2 className="text-3xl font-black text-slate-800 mb-3 tracking-tight uppercase italic">Access Restricted</h2>
+          <p className="text-slate-500 max-w-sm mx-auto font-medium leading-relaxed">
+            You do not have the necessary permissions to view the unified Dashboard. Please contact your property administrator.
+          </p>
+        </div>
+      ) : (
       <div className="flex flex-col gap-8">
 
         {/* TOP BAR / FILTERS */}
@@ -507,6 +525,7 @@ export const Dashboard = () => {
         )}
 
       </div>
+      )}
     </MainLayout>
   );
 };

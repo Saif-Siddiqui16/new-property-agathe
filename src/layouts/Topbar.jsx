@@ -23,6 +23,11 @@ export const Topbar = ({ title = 'Overview', onMenuClick }) => {
         const val = e.target.value;
         setSelectedProperty(val);
         localStorage.setItem('selectedProperty', val);
+        // Clear permissions so we don't use stale ones during loading/syncing
+        localStorage.removeItem('permissions');
+        // Store timestamp so MainLayout knows to wait for a fresh sync.
+        // Timestamp is immune to React StrictMode double-invocation (unlike removeItem flags).
+        sessionStorage.setItem('propertySwitchTime', Date.now().toString());
         window.location.reload(); // Reload to refresh all components and API base URLs
     };
 

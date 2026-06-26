@@ -280,9 +280,21 @@ const NavItem = ({ item, depth = 0, onClose }) => {
    SIDEBAR
  ========================= */
 
-export const Sidebar = ({ isOpen, onClose }) => {
+export const Sidebar = ({ isOpen, onClose, permissionsReady = true }) => {
   /* SCROLL PRESERVATION */
   const navRef = React.useRef(null);
+
+  // Permissions state at component level (fixes hooks-in-IIFE bug)
+  const [forceUpdate, setForceUpdate] = useState(0);
+  useEffect(() => {
+    const handleUpdate = () => setForceUpdate(prev => prev + 1);
+    window.addEventListener('permissionsUpdated', handleUpdate);
+    return () => window.removeEventListener('permissionsUpdated', handleUpdate);
+  }, []);
+
+  // Read from localStorage at component level so re-renders are stable
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const permissions = JSON.parse(localStorage.getItem('permissions') || '[]');
 
   useEffect(() => {
     // Restore scroll position on mount
@@ -345,17 +357,21 @@ export const Sidebar = ({ isOpen, onClose }) => {
           <div className="px-4 mb-2 mt-2">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main Menu</p>
           </div>
-          {(() => {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            const permissions = JSON.parse(localStorage.getItem('permissions') || '[]');
-            
-            // Re-render trigger from custom event
-            const [forceUpdate, setForceUpdate] = React.useState(0);
-            React.useEffect(() => {
-              const handleUpdate = () => setForceUpdate(prev => prev + 1);
-              window.addEventListener('permissionsUpdated', handleUpdate);
-              return () => window.removeEventListener('permissionsUpdated', handleUpdate);
-            }, []);
+
+          {/* Show skeleton while permissions are being confirmed after a property switch */}
+          {!permissionsReady ? (
+            <div className="space-y-1 px-1">
+              {[...Array(7)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-11 rounded-2xl bg-slate-100 animate-pulse"
+                  style={{ animationDelay: `${i * 60}ms`, opacity: 0.6 + i * 0.05 }}
+                />
+              ))}
+            </div>
+          ) : (() => {
+            // user, permissions, forceUpdate now come from component level (no hooks here)
+            const _ = forceUpdate; // reference to trigger re-render when permissions change
 
             const labelToModule = {
               'Dashboard': 'Dashboard',
@@ -453,7 +469,9 @@ export const Sidebar = ({ isOpen, onClose }) => {
               <NavItem key={item.label} item={item} onClose={onClose} />
             ));
           })()}
+
         </nav>
+
 
         <div className="p-6 border-t border-slate-50 shrink-0">
           <Link to="/profile" className="block no-underline">

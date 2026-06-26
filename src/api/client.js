@@ -2,8 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
     //baseURL: 'http://localhost:5000',
-    //baseURL: 'https://property-demo-saif-production.up.railway.app',
-    //baseURL: 'https://saif-property-news-production-9d29.up.railway.app',
+
     baseURL: 'https://saif-property-client-railway-production.up.railway.app',
 
     headers: {
@@ -15,21 +14,24 @@ const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         const selectedProperty = localStorage.getItem('selectedProperty') || 'masteko';
-        
+
         let backendUrl;
 
         if (selectedProperty === 'masteko') {
             // Masteko (Property 1) -> saif-property-client-railway
             backendUrl = 'https://saif-property-client-railway-production.up.railway.app';
+            //backendUrl = 'http://localhost:5000';
         } else {
             // St Agathe (Property 2) -> property2
             backendUrl = 'https://saif-property2-client-railway-production.up.railway.app';
+            //backendUrl = 'http://localhost:5001';
         }
 
         // FORCE CENTRALIZED PERMISSIONS: 
         // Always fetch permissions from Masteko backend, regardless of which property is selected
-        if (config.url && config.url.includes('/my-permissions')) {
+        if (config.url && (config.url.includes('/my-permissions') || config.url.includes('/permissions'))) {
             backendUrl = 'https://saif-property-client-railway-production.up.railway.app';
+            //backendUrl = 'http://localhost:5000';
         }
 
         config.baseURL = backendUrl;
