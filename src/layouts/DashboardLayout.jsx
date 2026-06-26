@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 
+
 export const DashboardLayout = ({ children, title }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
