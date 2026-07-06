@@ -568,11 +568,14 @@ export const Tenants = () => {
                         <span className="w-fit">
                           <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${tenant.leaseStatus === 'Active'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                            : tenant.leaseStatus === 'Scheduled'
+                              ? 'bg-blue-50 text-blue-700 border-blue-100'
                             : tenant.leaseStatus === 'DRAFT'
                               ? 'bg-amber-50 text-amber-700 border-amber-100'
                               : 'bg-red-50 text-red-700 border-red-100'
                             }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${tenant.leaseStatus === 'Active' ? 'bg-emerald-500' :
+                              tenant.leaseStatus === 'Scheduled' ? 'bg-blue-500' :
                               tenant.leaseStatus === 'DRAFT' ? 'bg-amber-500' : 'bg-red-500'
                               }`}></span>
                             {tenant.leaseStatus === 'DRAFT' ? 'Draft' : tenant.leaseStatus}
@@ -653,11 +656,14 @@ export const Tenants = () => {
                           </div>
                           <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border ${tenant.leaseStatus === 'Active'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                            : tenant.leaseStatus === 'Scheduled'
+                              ? 'bg-blue-50 text-blue-700 border-blue-100'
                             : tenant.leaseStatus === 'DRAFT'
                               ? 'bg-amber-50 text-amber-700 border-amber-100'
                               : 'bg-red-50 text-red-700 border-red-100'
                             }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${tenant.leaseStatus === 'Active' ? 'bg-emerald-500' :
+                              tenant.leaseStatus === 'Scheduled' ? 'bg-blue-500' :
                               tenant.leaseStatus === 'DRAFT' ? 'bg-amber-500' : 'bg-red-500'
                               }`}></span>
                             {tenant.leaseStatus === 'DRAFT' ? 'Draft' : tenant.leaseStatus}
@@ -1218,9 +1224,9 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
       setTenantData({
         ...data,
         name: data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim(),
-        leaseStatus: data.type === 'RESIDENT' ? 'Occupant' : (data.leases?.find(l => l.status === 'Active')?.status || data.leases?.find(l => l.status === 'DRAFT')?.status || 'Inactive'),
-        property: data.leases?.find(l => l.status === 'Active')?.unit?.property?.name || data.assignedUnit?.property?.name || 'No Property',
-        unit: data.leases?.find(l => l.status === 'Active')?.unit?.unitNumber || data.leases?.find(l => l.status === 'Active')?.unit?.name || data.assignedUnit?.unitNumber || data.assignedUnit?.name || 'No Unit'
+        leaseStatus: data.type === 'RESIDENT' ? 'Occupant' : (data.leases?.find(l => l.status === 'Active')?.status || data.leases?.find(l => l.status === 'Scheduled')?.status || data.leases?.find(l => l.status === 'DRAFT')?.status || 'Inactive'),
+        property: data.leases?.find(l => l.status === 'Active' || l.status === 'Scheduled')?.unit?.property?.name || data.assignedUnit?.property?.name || 'No Property',
+        unit: data.leases?.find(l => l.status === 'Active' || l.status === 'Scheduled')?.unit?.unitNumber || data.leases?.find(l => l.status === 'Active' || l.status === 'Scheduled')?.unit?.name || data.assignedUnit?.unitNumber || data.assignedUnit?.name || 'No Unit'
       });
       setDocuments(data.documents || []);
       setPolicies(data.insurances || []);
@@ -1530,7 +1536,7 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
               <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
                 <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Status</h4>
                 <div className="flex items-center gap-2">
-                  <div className={`w-2.5 h-2.5 rounded-full ${tenantData.leaseStatus === 'Active' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                  <div className={`w-2.5 h-2.5 rounded-full ${tenantData.leaseStatus === 'Active' ? 'bg-emerald-500' : tenantData.leaseStatus === 'Scheduled' ? 'bg-blue-500' : 'bg-red-500'}`}></div>
                   <span className="font-semibold text-slate-700">{tenantData.leaseStatus}</span>
                 </div>
               </div>
@@ -1731,6 +1737,7 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                           </td>
                           <td className="px-6 py-4">
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-tight ${lease.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                              lease.status === 'Scheduled' ? 'bg-blue-50 text-blue-700 border-blue-100' :
                               lease.status === 'DRAFT' ? 'bg-amber-50 text-amber-700 border-amber-100' :
                                 'bg-slate-50 text-slate-500 border-slate-100'
                               }`}>

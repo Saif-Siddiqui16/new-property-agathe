@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import { MainLayout } from '../layouts/MainLayout';
 import { Card } from '../components/Card';
 import api from '../api/client';
@@ -57,37 +58,26 @@ export const Dashboard = () => {
     }, []);
 
     // All hooks must be declared before any early return (React rules of hooks)
-    const [stats, setStats] = useState(null);
-    const [revenueStats, setRevenueStats] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [selectedOwnerId, setSelectedOwnerId] = useState('');
     const [leaseAlertPage, setLeaseAlertPage] = useState(1);
     const [reservedUnitPage, setReservedUnitPage] = useState(1);
     const leaseAlertsPerPage = 5;
     const reservedUnitsPerPage = 5;
 
-    const fetchStats = async (ownerId = '') => {
-        try {
-            setLoading(true);
-            const ownerParam = ownerId ? `?ownerId=${ownerId}` : '';
-            const [dashRes, revRes] = await Promise.all([
-                api.get(`/api/admin/dashboard/stats${ownerParam}`),
-                api.get(`/api/admin/analytics/revenue${ownerParam}`)
-            ]);
-            setStats(dashRes.data);
-            setRevenueStats(revRes.data);
-        } catch (error) {
-            console.error('Failed to fetch dashboard stats', error);
-            setStats(null);
-            setRevenueStats(null);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const fetcher = url => api.get(url).then(res => res.data);
+    const ownerParam = selectedOwnerId ? `?ownerId=${selectedOwnerId}` : '';
 
-    useEffect(() => {
-        fetchStats(selectedOwnerId);
-    }, [selectedOwnerId]);
+    // SWR handles caching, stale-while-revalidate, and background updates automatically
+    const { data: stats, mutate: mutateStats } = useSWR(
+      `/api/admin/dashboard/stats${ownerParam}`,
+      fetcher,
+      { revalidateOnFocus: false }
+    );
+    const { data: revenueStats } = useSWR(
+      `/api/admin/analytics/revenue${ownerParam}`,
+      fetcher,
+      { revalidateOnFocus: false }
+    );
 
     const canViewAnyDashboard = hasPermission('Dashboard', 'view') || 
                                hasPermission('Overview', 'view') || 
@@ -108,7 +98,7 @@ export const Dashboard = () => {
         reason: 'Refund process cancelled via Dashboard Alert'
       });
       alert('Refund process cancelled successfully.');
-      fetchStats(selectedOwnerId);
+      mutateStats();
     } catch (error) {
       console.error('Failed to cancel refund process', error);
       alert('Failed to cancel refund process');
@@ -228,9 +218,14 @@ export const Dashboard = () => {
           <OwnerSelector value={selectedOwnerId} onOwnerChange={(id) => setSelectedOwnerId(id)} />
         </section>
 
-        {loading ? (
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        {!stats ? (
+          <div className="flex flex-col gap-6 animate-pulse mt-4">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-6">
+                <div className="h-32 bg-slate-200 rounded-[18px]"></div>
+                <div className="h-32 bg-slate-200 rounded-[18px]"></div>
+                <div className="h-32 bg-slate-200 rounded-[18px]"></div>
+            </div>
+            <div className="h-64 bg-slate-200 rounded-[24px]"></div>
           </div>
         ) : (
           <>

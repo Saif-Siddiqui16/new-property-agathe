@@ -31,7 +31,7 @@ api.interceptors.request.use(
         // Always fetch permissions from Masteko backend, regardless of which property is selected
         if (config.url && (config.url.includes('/my-permissions') || config.url.includes('/permissions'))) {
             backendUrl = 'https://saif-property-client-railway-production.up.railway.app';
-            //backendUrl = 'http://localhost:5000';
+            //WbackendUrl = 'http://localhost:5000';
         }
 
         config.baseURL = backendUrl;
