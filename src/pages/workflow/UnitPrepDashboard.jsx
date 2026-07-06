@@ -168,35 +168,58 @@ const UnitPrepDashboard = () => {
                 )}
             </div>
 
-            <button
-                onClick={() => {
-                    const stages = ['PENDING_TICKETS', 'READY_FOR_CLEANING', 'CLEANING_IN_PROGRESS', 'CLEANING_COMPLETED', 'UNIT_READY'];
-                    const currentIndex = stages.indexOf(item.current_stage);
-                    if (currentIndex < stages.length - 1) {
-                        updateStage(item.id, stages[currentIndex + 1]);
-                    }
-                }}
-                className={`w-full py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-2
-                ${item.hasRequiredTickets ? 'bg-gray-100 text-gray-400 cursor-not-allowed' :
-                        columnTitle.includes('Deficiencies') ? 'bg-indigo-600 text-white hover:bg-indigo-700' :
-                            columnTitle.includes('Ready for Cleaning') ? 'bg-amber-600 text-white hover:bg-amber-700' :
-                                columnTitle.includes('Progress') ? 'bg-blue-600 text-white hover:bg-blue-700' :
-                                    'bg-green-600 text-white hover:bg-green-700'}`}>
-                {item.hasRequiredTickets ? 'Blocked by Tickets' :
+            {(() => {
+                const stages = ['PENDING_TICKETS', 'READY_FOR_CLEANING', 'CLEANING_IN_PROGRESS', 'CLEANING_COMPLETED', 'UNIT_READY', 'COMPLETE_PREP'];
+                const currentIndex = stages.indexOf(item.current_stage);
+                const isBlocked = item.hasRequiredTickets;
+                
+                // The last stage is 'COMPLETE_PREP' (index 5). If a card is at index 5, it means it's done.
+                // But since 'COMPLETE_PREP' sets current_stage to null, cards will disappear instead of showing index 5.
+                // So index 4 (UNIT_READY) is the last visible stage, and clicking it triggers 'COMPLETE_PREP'.
+                const isLastStage = currentIndex === stages.length - 1; 
+                const isDisabled = isBlocked || isLastStage;
+
+                const buttonLabel = isBlocked ? 'Blocked by Tickets' :
                     item.current_stage === 'PENDING_TICKETS' ? 'Move to Cleaning' :
                         item.current_stage === 'READY_FOR_CLEANING' ? 'Start Cleaning' :
                             item.current_stage === 'CLEANING_IN_PROGRESS' ? 'Complete Cleaning' :
-                                item.current_stage === 'CLEANING_COMPLETED' ? 'Mark Unit Ready' : 'Unit Ready'}
-                <ArrowRight size={14} />
-            </button>
-            {item.hasRequiredTickets && (
-                <button
-                    onClick={() => overrideStage(item.id)}
-                    className="w-full mt-2 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 bg-red-50 text-red-600 border border-red-100 hover:bg-red-100"
-                >
-                    Bypass Tickets
-                </button>
-            )}
+                                item.current_stage === 'CLEANING_COMPLETED' ? 'Mark Unit Ready' :
+                                    item.current_stage === 'UNIT_READY' ? 'Complete Prep Flow' : '✓ Unit Ready';
+
+                const buttonClass = isBlocked
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : item.current_stage === 'UNIT_READY'
+                        ? 'bg-indigo-700 text-white hover:bg-indigo-800 active:scale-95 border border-indigo-800'
+                        : item.current_stage === 'PENDING_TICKETS' ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                            : item.current_stage === 'READY_FOR_CLEANING' ? 'bg-amber-600 text-white hover:bg-amber-700'
+                                : item.current_stage === 'CLEANING_IN_PROGRESS' ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                    : 'bg-green-600 text-white hover:bg-green-700 active:scale-95';
+
+                return (
+                    <>
+                        <button
+                            disabled={isDisabled}
+                            onClick={() => {
+                                if (!isDisabled && currentIndex < stages.length - 1) {
+                                    updateStage(item.id, stages[currentIndex + 1]);
+                                }
+                            }}
+                            className={`w-full py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-2 ${buttonClass}`}
+                        >
+                            {buttonLabel}
+                            <ArrowRight size={14} />
+                        </button>
+                        {isBlocked && (
+                            <button
+                                onClick={() => overrideStage(item.id)}
+                                className="w-full mt-2 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 bg-red-50 text-red-600 border border-red-100 hover:bg-red-100"
+                            >
+                                Bypass Tickets
+                            </button>
+                        )}
+                    </>
+                );
+            })()}
         </div>
     );
 
