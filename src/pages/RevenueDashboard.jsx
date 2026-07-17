@@ -13,7 +13,26 @@ import {
 } from 'recharts';
 
 import api from '../api/client';
+import useSWR from 'swr';
 import { OwnerSelector } from '../components/OwnerSelector';
+
+const fetcher = (url) => api.get(url).then((res) => res.data);
+
+const parseMonth = (s) => {
+  if (!s || typeof s !== 'string') return 0;
+  if (s.includes('-')) {
+    const [y, m] = s.split('-');
+    return new Date(y, parseInt(m, 10) - 1).getTime();
+  }
+  const [mName, y] = s.split(' ');
+  const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+  const shortMonthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+  let mIdx = monthNames.indexOf(mName.toLowerCase());
+  if (mIdx === -1) mIdx = shortMonthNames.indexOf(mName.toLowerCase());
+
+  return new Date(y, mIdx !== -1 ? mIdx : 0).getTime();
+};
 
 export const RevenueDashboard = () => {
   const [__forceUpdate, __setForceUpdate] = useState(0);
@@ -25,7 +44,14 @@ export const RevenueDashboard = () => {
 
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('all');
-  const [loading, setLoading] = useState(false);
+
+  const ownerParam = selectedOwnerId ? `?ownerId=${selectedOwnerId}` : '';
+  const revenueUrl = `/api/admin/analytics/revenue${ownerParam}`;
+  const dashboardUrl = `/api/admin/dashboard/stats${ownerParam}`;
+
+  const { data: revenueData, error: revenueError } = useSWR(revenueUrl, fetcher);
+  const { data: dashboardData, error: dashboardError } = useSWR(dashboardUrl, fetcher);
+
   const [stats, setStats] = useState({
     actualRevenue: 0,
     actualRent: 0,
@@ -38,32 +64,9 @@ export const RevenueDashboard = () => {
     recentActivity: []
   });
 
-  const fetchStats = async (ownerId = '') => {
-    try {
-      setLoading(true);
-      const ownerParam = ownerId ? `?ownerId=${ownerId}` : '';
-      const [res, dashRes] = await Promise.all([
-        api.get(`/api/admin/analytics/revenue${ownerParam}`),
-        api.get(`/api/admin/dashboard/stats${ownerParam}`)
-      ]);
-      const data = res.data;
-
-      // Ensure chronological sorting of monthlyRevenue (instead of alphabetical)
-      const parseMonth = (s) => {
-        if (!s || typeof s !== 'string') return 0;
-        if (s.includes('-')) {
-          const [y, m] = s.split('-');
-          return new Date(y, parseInt(m, 10) - 1).getTime();
-        }
-        const [mName, y] = s.split(' ');
-        const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-        const shortMonthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-
-        let mIdx = monthNames.indexOf(mName.toLowerCase());
-        if (mIdx === -1) mIdx = shortMonthNames.indexOf(mName.toLowerCase());
-
-        return new Date(y, mIdx !== -1 ? mIdx : 0).getTime();
-      };
+  useEffect(() => {
+    if (revenueData && dashboardData) {
+      const data = { ...revenueData };
 
       if (data.monthlyRevenue) {
         data.monthlyRevenue.sort((a, b) => parseMonth(a.month) - parseMonth(b.month));
@@ -80,26 +83,13 @@ export const RevenueDashboard = () => {
 
       setStats({
         ...data,
-        recentActivity: dashRes.data.recentActivity || []
+        recentActivity: dashboardData.recentActivity || []
       });
       setSelectedMonth('all'); // reset month filter on owner change
-    } catch (e) {
-      console.error('Revenue Fetch Error:', e);
-      setStats({
-        actualRevenue: 0,
-        projectedRevenue: 0,
-        totalRevenue: 0,
-        monthlyRevenue: [],
-        revenueByProperty: []
-      });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [revenueData, dashboardData]);
 
-  useEffect(() => {
-    fetchStats(selectedOwnerId);
-  }, [selectedOwnerId]);
+  const loading = (!revenueData && !revenueError) || (!dashboardData && !dashboardError);
 
   // Format month label: "2025-03" → "Mar '25"
   // Format month label: "2025-03" -> "Mar '25" or "March 2026" -> "Mar '26"

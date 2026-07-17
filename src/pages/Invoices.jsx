@@ -309,6 +309,36 @@ export const Invoices = () => {
         { id: 8, name: 'September' }, { id: 9, name: 'October' }, { id: 10, name: 'November' }, { id: 11, name: 'December' }
     ];
 
+    const getPageNumbers = () => {
+        const pageNumbers = [];
+        const maxPageButtons = 5;
+        if (totalPages <= maxPageButtons + 2) {
+            for (let i = 1; i <= totalPages; i++) {
+                pageNumbers.push(i);
+            }
+        } else {
+            pageNumbers.push(1);
+            let start = Math.max(2, currentPage - 1);
+            let end = Math.min(totalPages - 1, currentPage + 1);
+            if (currentPage <= 3) {
+                end = 4;
+            } else if (currentPage >= totalPages - 2) {
+                start = totalPages - 3;
+            }
+            if (start > 2) {
+                pageNumbers.push('...');
+            }
+            for (let i = start; i <= end; i++) {
+                pageNumbers.push(i);
+            }
+            if (end < totalPages - 1) {
+                pageNumbers.push('...');
+            }
+            pageNumbers.push(totalPages);
+        }
+        return pageNumbers;
+    };
+
     return (
         <MainLayout title="Rent Invoices">
             <div className="p-6 flex flex-col gap-6">
@@ -598,20 +628,45 @@ export const Invoices = () => {
 
                 {/* PAGINATION UI */}
                 {totalPages > 1 && (
-                    <div className="flex justify-center items-center gap-2 mt-4 pb-10">
-                        {[...Array(totalPages)].map((_, idx) => (
-                            <button
-                                key={idx + 1}
-                                onClick={() => setCurrentPage(idx + 1)}
-                                className={`w-10 h-10 rounded-xl text-sm font-black transition-all border ${
-                                    currentPage === idx + 1 
-                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100' 
-                                    : 'bg-white text-slate-500 border-slate-100 hover:border-indigo-300 hover:text-indigo-600'
-                                }`}
-                            >
-                                {idx + 1}
-                            </button>
-                        ))}
+                    <div className="flex justify-center items-center gap-1.5 mt-4 pb-10 select-none">
+                        <button
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            className="px-3.5 h-10 rounded-xl border border-slate-100 text-xs font-bold text-slate-500 bg-white hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            Previous
+                        </button>
+                        
+                        {getPageNumbers().map((page, idx) => {
+                            if (page === '...') {
+                                return (
+                                    <span key={`ell-${idx}`} className="w-10 h-10 flex items-center justify-center text-slate-400 font-bold">
+                                        ...
+                                    </span>
+                                );
+                            }
+                            return (
+                                <button
+                                    key={page}
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`w-10 h-10 rounded-xl text-sm font-black transition-all border ${
+                                        currentPage === page
+                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100'
+                                            : 'bg-white text-slate-500 border-slate-100 hover:border-indigo-300 hover:text-indigo-600'
+                                    }`}
+                                >
+                                    {page}
+                                </button>
+                            );
+                        })}
+                        
+                        <button
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            className="px-3.5 h-10 rounded-xl border border-slate-100 text-xs font-bold text-slate-500 bg-white hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            Next
+                        </button>
                     </div>
                 )}
 

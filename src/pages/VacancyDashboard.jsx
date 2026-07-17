@@ -4,8 +4,11 @@ import { Card } from '../components/Card';
 
 import { useState, useEffect } from 'react';
 import api from '../api/client';
+import useSWR from 'swr';
 
 import { OwnerSelector } from '../components/OwnerSelector';
+
+const fetcher = (url) => api.get(url).then((res) => res.data);
 
 export const VacancyDashboard = () => {
   const [__forceUpdate, __setForceUpdate] = useState(0);
@@ -16,7 +19,13 @@ export const VacancyDashboard = () => {
   }, []);
 
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
-  const [loading, setLoading] = useState(false);
+  
+  const fetchUrl = selectedOwnerId 
+    ? `/api/admin/analytics/vacancy?ownerId=${selectedOwnerId}` 
+    : '/api/admin/analytics/vacancy';
+
+  const { data, error } = useSWR(fetchUrl, fetcher);
+
   const [stats, setStats] = useState({
     total: 0,
     vacant: 0,
@@ -27,31 +36,13 @@ export const VacancyDashboard = () => {
     vacancyByBuilding: []
   });
 
-  const fetchStats = async (ownerId = '') => {
-    try {
-      setLoading(true);
-      const url = ownerId ? `/api/admin/analytics/vacancy?ownerId=${ownerId}` : '/api/admin/analytics/vacancy';
-      const res = await api.get(url);
-      setStats(res.data);
-    } catch (e) {
-      console.error('Vacancy Fetch Error:', e);
-      setStats({
-        total: 0,
-        vacant: 0,
-        occupied: 0,
-        totalVacantBedrooms: 0,
-        fullUnitCount: 0,
-        bedroomWiseCount: 0,
-        vacancyByBuilding: []
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchStats(selectedOwnerId);
-  }, [selectedOwnerId]);
+    if (data) {
+      setStats(data);
+    }
+  }, [data]);
+
+  const loading = !data && !error;
 
   return (
     <MainLayout title="Vacancy Dashboard">

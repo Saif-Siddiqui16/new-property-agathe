@@ -42,6 +42,18 @@ export const Tickets = () => {
     // Print State
     const [selectedForPrint, setSelectedForPrint] = useState(new Set());
 
+    // Pagination & Filtering States
+    const [currentPage, setCurrentPage] = useState(1);
+    const [selectedStatusFilter, setSelectedStatusFilter] = useState('All');
+    const [selectedPriorityFilter, setSelectedPriorityFilter] = useState('All');
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+    const itemsPerPage = 10;
+
+    // Reset pagination to first page when search query or filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, selectedStatusFilter, selectedPriorityFilter]);
+
     useEffect(() => {
         fetchTickets();
         fetchBuildings();
@@ -80,10 +92,19 @@ export const Tickets = () => {
         finally { setLoadingTenants(false); }
     };
 
-    const filteredTickets = tickets.filter(t =>
-        (t.tenant || '').toLowerCase().includes(search.toLowerCase()) ||
-        (t.id || '').toLowerCase().includes(search.toLowerCase()) ||
-        (t.subject || '').toLowerCase().includes(search.toLowerCase())
+    const filteredTickets = tickets.filter(t => {
+        const matchesSearch = (t.tenant || '').toLowerCase().includes(search.toLowerCase()) ||
+            (t.id || '').toLowerCase().includes(search.toLowerCase()) ||
+            (t.subject || '').toLowerCase().includes(search.toLowerCase());
+        const matchesStatus = selectedStatusFilter === 'All' || t.status === selectedStatusFilter;
+        const matchesPriority = selectedPriorityFilter === 'All' || t.priority === selectedPriorityFilter;
+        return matchesSearch && matchesStatus && matchesPriority;
+    });
+
+    const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
+    const paginatedTickets = filteredTickets.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
     );
 
     const updateStatus = async (id, newStatus) => {
@@ -270,6 +291,59 @@ export const Tickets = () => {
                     </div>
                 )}
 
+                {/* Premium Stats Dashboard Row */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
+                    {/* CARD 1: Total Tickets */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-4 hover:shadow-md transition-all">
+                        <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                            <Filter size={24} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-2xl font-black text-slate-800 leading-none mb-1">{tickets.length}</span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Tickets</span>
+                        </div>
+                    </div>
+
+                    {/* CARD 2: Open Tickets */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-4 hover:shadow-md transition-all">
+                        <div className="p-3.5 bg-amber-50 text-amber-600 rounded-xl">
+                            <AlertTriangle size={24} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-2xl font-black text-slate-800 leading-none mb-1">
+                                {tickets.filter(t => t.status === 'Open').length}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Tickets</span>
+                        </div>
+                    </div>
+
+                    {/* CARD 3: In Progress */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-4 hover:shadow-md transition-all">
+                        <div className="p-3.5 bg-blue-50 text-blue-600 rounded-xl">
+                            <Clock size={24} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-2xl font-black text-slate-800 leading-none mb-1">
+                                {tickets.filter(t => t.status === 'In Progress').length}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">In Progress</span>
+                        </div>
+                    </div>
+
+                    {/* CARD 4: High Priority */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-4 hover:shadow-md transition-all">
+                        <div className="p-3.5 bg-rose-50 text-rose-600 rounded-xl">
+                            <AlertTriangle size={24} className="stroke-[2.5]" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-2xl font-black text-slate-800 leading-none mb-1">
+                                {tickets.filter(t => t.priority === 'High').length}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">High Priority</span>
+                        </div>
+                    </div>
+                </div>
+
                 <section className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-[0_5px_15px_rgba(0,0,0,0.06)] gap-4">
                     <div className="flex items-center gap-3 bg-slate-50 px-4 py-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all w-full md:w-auto md:min-w-[320px]">
                         <Search size={18} className="text-slate-400" />
@@ -289,10 +363,76 @@ export const Tickets = () => {
                                 Print ({selectedForPrint.size})
                             </Button>
                         )}
-                        <Button variant="secondary" size="sm">
-                            <Filter size={16} />
-                            Filters
-                        </Button>
+                        
+                        {/* Filters Dropdown */}
+                        <div className="relative">
+                            <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                                className={clsx(
+                                    showFilterDropdown && "bg-slate-100 border-slate-300",
+                                    (selectedStatusFilter !== 'All' || selectedPriorityFilter !== 'All') && "border-indigo-300 text-indigo-600 bg-indigo-50/50"
+                                )}
+                            >
+                                <Filter size={16} />
+                                Filters
+                                {(selectedStatusFilter !== 'All' || selectedPriorityFilter !== 'All') && (
+                                    <span className="ml-1 w-2 h-2 rounded-full bg-indigo-600"></span>
+                                )}
+                            </Button>
+                            
+                            {showFilterDropdown && (
+                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-50 flex flex-col gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Status</label>
+                                        <select
+                                            value={selectedStatusFilter}
+                                            onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-indigo-500"
+                                        >
+                                            <option value="All">All Statuses</option>
+                                            <option value="Open">Open</option>
+                                            <option value="In Progress">In Progress</option>
+                                            <option value="Resolved">Resolved</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Priority</label>
+                                        <select
+                                            value={selectedPriorityFilter}
+                                            onChange={(e) => setSelectedPriorityFilter(e.target.value)}
+                                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-indigo-500"
+                                        >
+                                            <option value="All">All Priorities</option>
+                                            <option value="High">High</option>
+                                            <option value="Medium">Medium</option>
+                                            <option value="Low">Low</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedStatusFilter('All');
+                                                setSelectedPriorityFilter('All');
+                                            }}
+                                            className="text-[10px] font-bold text-indigo-600 hover:underline"
+                                        >
+                                            Reset
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => setShowFilterDropdown(false)}
+                                            className="text-[10px] font-black bg-indigo-600 text-white px-3 py-1 rounded-md hover:bg-indigo-700 transition-colors"
+                                        >
+                                            Apply
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {hasPermission('Tickets', 'add') && (
                             <Button variant="primary" size="sm" onClick={() => setShowAddModal(true)}>
                                 <Plus size={16} />
@@ -315,7 +455,7 @@ export const Tickets = () => {
                     </div>
 
                     <div className="divide-y divide-slate-100">
-                        {filteredTickets.map((ticket, index) => (
+                        {paginatedTickets.map((ticket, index) => (
                             <div
                                 key={ticket.id}
                                 className="grid grid-cols-[auto_1fr_1.5fr_1.2fr_1.2fr_1fr_1fr_0.5fr] gap-4 px-6 py-4 items-center hover:bg-slate-50/80 transition-all duration-200"
@@ -398,6 +538,52 @@ export const Tickets = () => {
                             </div>
                         ))}
                     </div>
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-100 px-6 py-4 bg-white rounded-b-xl gap-4">
+                            <span className="text-xs font-semibold text-slate-500">
+                                Showing <span className="font-bold text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                                <span className="font-bold text-slate-800">
+                                    {Math.min(currentPage * itemsPerPage, filteredTickets.length)}
+                                </span>{' '}
+                                of <span className="font-bold text-slate-800">{filteredTickets.length}</span> tickets
+                            </span>
+                            
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    disabled={currentPage === 1}
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    Previous
+                                </button>
+                                
+                                {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(page => (
+                                    <button
+                                        key={page}
+                                        onClick={() => setCurrentPage(page)}
+                                        className={clsx(
+                                            "w-8 h-8 rounded-lg text-xs font-black transition-all border",
+                                            currentPage === page
+                                                ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100"
+                                                : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                                        )}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
+                                
+                                <button
+                                    disabled={currentPage === totalPages}
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </section>
 
                 {selectedTicket && (
