@@ -330,7 +330,7 @@ export const Tickets = () => {
                 )}
 
                 {/* Premium Stats Dashboard Row */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-2">
                     {/* CARD 1: Total Tickets */}
                     <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-4 hover:shadow-md transition-all">
                         <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-xl">
@@ -368,7 +368,20 @@ export const Tickets = () => {
                         </div>
                     </div>
 
-                    {/* CARD 4: High Priority */}
+                    {/* CARD 4: Resolved */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-4 hover:shadow-md transition-all">
+                        <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-xl">
+                            <CheckCircle size={24} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-2xl font-black text-slate-800 leading-none mb-1">
+                                {tickets.filter(t => t.status === 'Resolved').length}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Resolved</span>
+                        </div>
+                    </div>
+
+                    {/* CARD 5: High Priority */}
                     <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-4 hover:shadow-md transition-all">
                         <div className="p-3.5 bg-rose-50 text-rose-600 rounded-xl">
                             <AlertTriangle size={24} className="stroke-[2.5]" />
@@ -662,6 +675,23 @@ export const Tickets = () => {
                                 <div>
                                     <h3 className="text-2xl font-bold text-slate-800">{selectedTicket.id}</h3>
                                     <p className="text-sm text-slate-500">Created: {selectedTicket.createdAt}</p>
+                                    {selectedTicket.status === 'Resolved' && selectedTicket.resolvedAt && (
+                                        <div className="mt-2 space-y-1">
+                                            <p className="text-sm text-emerald-600 font-semibold flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                Resolved: {new Date(selectedTicket.resolvedAt).toLocaleString()}
+                                            </p>
+                                            <p className="text-xs text-indigo-600 font-bold bg-indigo-50 border border-indigo-100 rounded-lg px-2.5 py-1.5 inline-block">
+                                                ⏱️ Resolution Time: {(() => {
+                                                    const start = new Date(selectedTicket.createdAtRaw || selectedTicket.createdAt);
+                                                    const end = new Date(selectedTicket.resolvedAt);
+                                                    const diffTime = Math.abs(end - start);
+                                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                    return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+                                                })()}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                                 <button onClick={() => setSelectedTicket(null)} className="text-slate-400 hover:text-slate-600">
                                     <X size={24} />
