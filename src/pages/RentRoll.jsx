@@ -262,7 +262,8 @@ export const RentRoll = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-3 mt-2">
                     {[
                         { label: 'Total Units', value: data.summary.totalUnits, icon: Building, color: 'text-indigo-500' },
-                        { label: 'Occupied', value: data.summary.occupiedUnits, icon: KeySquare, color: 'text-emerald-500' },
+                        { label: 'Occupied Units', value: data.summary.occupiedUnits, icon: KeySquare, color: 'text-emerald-500' },
+                        { label: 'Occupied Bedrooms', value: data.summary.occupiedBedrooms, icon: KeySquare, color: 'text-emerald-600' },
                         { label: 'Vacant Units', value: data.summary.vacantUnits, icon: DoorOpen, color: 'text-red-500' },
                         { label: 'Vacant Bedrooms', value: data.summary.vacantBedrooms, icon: DoorOpen, color: 'text-amber-500' },
                         { label: 'Total Actual Monthly Rent', value: `$${(data.summary.totalActualMonthlyRent || 0).toLocaleString()}`, icon: Wallet, color: 'text-indigo-600', isLarge: true },

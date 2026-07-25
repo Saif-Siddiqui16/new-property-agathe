@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MainLayout } from '../layouts/MainLayout';
 import { Button } from '../components/Button';
-import { Search, Eye, Filter, CheckCircle, Clock, AlertTriangle, X, Plus, User, Building, Home, ChevronDown, Trash2, Edit2, Play, Camera, Printer } from 'lucide-react';
+import { Search, Eye, Filter, CheckCircle, Clock, AlertTriangle, X, Plus, User, Building, Home, ChevronDown, Trash2, Edit2, Play, Camera, Printer, Download } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../api/client';
 import { hasPermission } from '../utils/permissions';
@@ -39,6 +39,10 @@ export const Tickets = () => {
     const [successMessage, setSuccessMessage] = useState('');
     const [attachments, setAttachments] = useState({});
     
+    // Export Date States
+    const [exportStartDate, setExportStartDate] = useState('');
+    const [exportEndDate, setExportEndDate] = useState('');
+
     // Print State
     const [selectedForPrint, setSelectedForPrint] = useState(new Set());
 
@@ -48,6 +52,40 @@ export const Tickets = () => {
     const [selectedPriorityFilter, setSelectedPriorityFilter] = useState('All');
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
     const itemsPerPage = 10;
+
+    const handleExportCSV = async () => {
+        try {
+            if (!exportStartDate || !exportEndDate) {
+                alert('Please specify both From Date and To Date for exporting.');
+                return;
+            }
+
+            const queryParams = new URLSearchParams({
+                startDate: exportStartDate,
+                endDate: exportEndDate
+            }).toString();
+
+            const response = await api.get(`/api/admin/tickets/export?${queryParams}`, {
+                responseType: 'blob'
+            });
+
+            const blob = new Blob([response.data], { type: 'application/vnd.ms-excel' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Tickets_Export_${exportStartDate}_to_${exportEndDate}.xls`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            setSuccessMessage('Tickets Exported Successfully!');
+            setTimeout(() => setSuccessMessage(''), 3000);
+        } catch (e) {
+            console.error('Error exporting tickets:', e);
+            alert('Failed to export tickets. Please ensure you have selected a valid date range.');
+        }
+    };
 
     // Reset pagination to first page when search query or filters change
     useEffect(() => {
@@ -344,16 +382,47 @@ export const Tickets = () => {
                     </div>
                 </div>
 
-                <section className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-[0_5px_15px_rgba(0,0,0,0.06)] gap-4">
-                    <div className="flex items-center gap-3 bg-slate-50 px-4 py-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all w-full md:w-auto md:min-w-[320px]">
-                        <Search size={18} className="text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Search by ID, tenant, or subject"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="bg-transparent border-none outline-none text-slate-700 placeholder:text-slate-400 w-full text-sm font-medium"
-                        />
+                <section className="flex flex-col lg:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-[0_5px_15px_rgba(0,0,0,0.06)] gap-4">
+                    <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                        <div className="flex items-center gap-3 bg-slate-50 px-4 py-2.5 rounded-lg border border-slate-200 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all w-full md:w-auto md:min-w-[320px]">
+                            <Search size={18} className="text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Search by ID, tenant, or subject"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="bg-transparent border-none outline-none text-slate-700 placeholder:text-slate-400 w-full text-sm font-medium"
+                            />
+                        </div>
+
+                        {/* Export Operational Date Range and Button */}
+                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">From:</span>
+                            <input
+                                type="date"
+                                value={exportStartDate}
+                                onChange={(e) => setExportStartDate(e.target.value)}
+                                className="bg-transparent border-none outline-none text-xs font-semibold text-slate-700 cursor-pointer"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">To:</span>
+                            <input
+                                type="date"
+                                value={exportEndDate}
+                                onChange={(e) => setExportEndDate(e.target.value)}
+                                className="bg-transparent border-none outline-none text-xs font-semibold text-slate-700 cursor-pointer"
+                            />
+                        </div>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleExportCSV}
+                            className="!border-emerald-200 !text-emerald-700 hover:!bg-emerald-50 font-bold"
+                        >
+                            <Download size={16} />
+                            Export
+                        </Button>
                     </div>
 
                     <div className="flex gap-2">
