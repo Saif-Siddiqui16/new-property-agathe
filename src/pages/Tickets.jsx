@@ -18,6 +18,29 @@ const statusIcons = {
     'Resolved': <CheckCircle size={14} className="text-emerald-500" />,
 };
 
+const getTicketAge = (ticket) => {
+    const start = new Date(ticket.createdAtRaw || ticket.createdAt);
+    let end;
+
+    if (ticket.status === 'Resolved') {
+        end = ticket.resolvedAt ? new Date(ticket.resolvedAt) : new Date(ticket.updatedAt || ticket.createdAt);
+    } else {
+        end = new Date();
+    }
+
+    const startZero = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const endZero = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+    const diffTime = endZero - startZero;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (ticket.status === 'Resolved') {
+        return diffDays === 0 ? "Resolved today" : `Resolved in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+    } else {
+        return diffDays === 0 ? "Created today" : `${diffDays} day${diffDays > 1 ? 's' : ''} open`;
+    }
+};
+
 export const Tickets = () => {
     const [__forceUpdate, __setForceUpdate] = useState(0);
     useEffect(() => {
@@ -581,10 +604,15 @@ export const Tickets = () => {
                                     </span>
                                 </span>
 
-                                <span className="flex items-center gap-2 text-sm text-slate-700">
-                                    {statusIcons[ticket.status]}
-                                    {ticket.status}
-                                </span>
+                                <div className="flex flex-col items-start gap-1">
+                                    <span className="flex items-center gap-2 text-sm text-slate-700 font-medium">
+                                        {statusIcons[ticket.status]}
+                                        {ticket.status}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 uppercase tracking-tight">
+                                        {getTicketAge(ticket)}
+                                    </span>
+                                </div>
 
                                  <span className="flex justify-center gap-1">
                                     <button
@@ -674,24 +702,35 @@ export const Tickets = () => {
                             <div className="flex justify-between items-center mb-6">
                                 <div>
                                     <h3 className="text-2xl font-bold text-slate-800">{selectedTicket.id}</h3>
-                                    <p className="text-sm text-slate-500">Created: {selectedTicket.createdAt}</p>
-                                    {selectedTicket.status === 'Resolved' && selectedTicket.resolvedAt && (
-                                        <div className="mt-2 space-y-1">
+                                    <p className="text-sm text-slate-500">Created: {new Date(selectedTicket.createdAtRaw || selectedTicket.createdAt).toLocaleString()}</p>
+                                    <div className="mt-2 space-y-1">
+                                        {selectedTicket.status === 'Resolved' && selectedTicket.resolvedAt && (
                                             <p className="text-sm text-emerald-600 font-semibold flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                                                 Resolved: {new Date(selectedTicket.resolvedAt).toLocaleString()}
                                             </p>
-                                            <p className="text-xs text-indigo-600 font-bold bg-indigo-50 border border-indigo-100 rounded-lg px-2.5 py-1.5 inline-block">
-                                                ⏱️ Resolution Time: {(() => {
-                                                    const start = new Date(selectedTicket.createdAtRaw || selectedTicket.createdAt);
-                                                    const end = new Date(selectedTicket.resolvedAt);
-                                                    const diffTime = Math.abs(end - start);
-                                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                                    return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
-                                                })()}
-                                            </p>
-                                        </div>
-                                    )}
+                                        )}
+                                        <p className="text-xs text-indigo-600 font-bold bg-indigo-50 border border-indigo-100 rounded-lg px-2.5 py-1.5 inline-block">
+                                            ⏱️ {selectedTicket.status === 'Resolved' ? 'Resolution Time' : 'Ticket Age'}: {(() => {
+                                                const start = new Date(selectedTicket.createdAtRaw || selectedTicket.createdAt);
+                                                let end;
+                                                if (selectedTicket.status === 'Resolved') {
+                                                    end = selectedTicket.resolvedAt ? new Date(selectedTicket.resolvedAt) : new Date(selectedTicket.updatedAt || selectedTicket.createdAt);
+                                                } else {
+                                                    end = new Date();
+                                                }
+                                                const startZero = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                                                const endZero = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+                                                const diffTime = endZero - startZero;
+                                                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                                                if (selectedTicket.status === 'Resolved') {
+                                                    return diffDays === 0 ? "Resolved today" : `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+                                                } else {
+                                                    return diffDays === 0 ? "Created today" : `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+                                                }
+                                            })()}
+                                        </p>
+                                    </div>
                                 </div>
                                 <button onClick={() => setSelectedTicket(null)} className="text-slate-400 hover:text-slate-600">
                                     <X size={24} />
