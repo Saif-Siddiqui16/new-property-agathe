@@ -13,8 +13,15 @@ const priorityColors = {
 };
 
 const statusIcons = {
+    'New': <AlertTriangle size={14} className="text-rose-500" />,
     'Open': <AlertTriangle size={14} className="text-amber-500" />,
+    'Assigned': <Clock size={14} className="text-indigo-500" />,
     'In Progress': <Clock size={14} className="text-blue-500" />,
+    'Waiting for Tenant': <Clock size={14} className="text-amber-500" />,
+    'Waiting for Parts': <Clock size={14} className="text-amber-500" />,
+    'On Hold': <AlertTriangle size={14} className="text-slate-400" />,
+    'Completed': <CheckCircle size={14} className="text-teal-500" />,
+    'Closed': <CheckCircle size={14} className="text-emerald-500" />,
     'Resolved': <CheckCircle size={14} className="text-emerald-500" />,
 };
 
@@ -22,8 +29,10 @@ const getTicketAge = (ticket) => {
     const start = new Date(ticket.createdAtRaw || ticket.createdAt);
     let end;
 
-    if (ticket.status === 'Resolved') {
-        end = ticket.resolvedAt ? new Date(ticket.resolvedAt) : new Date(ticket.updatedAt || ticket.createdAt);
+    const isDone = ['Resolved', 'Completed', 'Closed'].includes(ticket.status);
+
+    if (isDone) {
+        end = ticket.completedAt ? new Date(ticket.completedAt) : (ticket.resolvedAt ? new Date(ticket.resolvedAt) : new Date(ticket.updatedAt || ticket.createdAt));
     } else {
         end = new Date();
     }
@@ -34,8 +43,8 @@ const getTicketAge = (ticket) => {
     const diffTime = endZero - startZero;
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-    if (ticket.status === 'Resolved') {
-        return diffDays === 0 ? "Resolved today" : `Resolved in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+    if (isDone) {
+        return diffDays === 0 ? "Completed today" : `Completed in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
     } else {
         return diffDays === 0 ? "Created today" : `${diffDays} day${diffDays > 1 ? 's' : ''} open`;
     }
@@ -65,6 +74,7 @@ export const Tickets = () => {
     // Export Date States
     const [exportStartDate, setExportStartDate] = useState('');
     const [exportEndDate, setExportEndDate] = useState('');
+    const [coworkers, setCoworkers] = useState([]);
 
     // Print State
     const [selectedForPrint, setSelectedForPrint] = useState(new Set());
@@ -73,30 +83,39 @@ export const Tickets = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedStatusFilter, setSelectedStatusFilter] = useState('All');
     const [selectedPriorityFilter, setSelectedPriorityFilter] = useState('All');
+    const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('');
+    const [selectedBuildingFilter, setSelectedBuildingFilter] = useState('');
+    const [selectedAssigneeFilter, setSelectedAssigneeFilter] = useState('');
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
     const itemsPerPage = 10;
 
-    const handleExportCSV = async () => {
+    const handleExport = async (formatType = 'csv') => {
         try {
-            if (!exportStartDate || !exportEndDate) {
-                alert('Please specify both From Date and To Date for exporting.');
-                return;
-            }
+            const params = {
+                format: formatType
+            };
+            if (exportStartDate) params.startDate = exportStartDate;
+            if (exportEndDate) params.endDate = exportEndDate;
+            if (selectedBuildingFilter) params.propertyId = selectedBuildingFilter;
+            if (selectedStatusFilter !== 'All') params.status = selectedStatusFilter;
+            if (selectedCategoryFilter) params.category = selectedCategoryFilter;
+            if (selectedPriorityFilter !== 'All') params.priority = selectedPriorityFilter;
+            if (selectedAssigneeFilter) params.assignedToId = selectedAssigneeFilter;
 
-            const queryParams = new URLSearchParams({
-                startDate: exportStartDate,
-                endDate: exportEndDate
-            }).toString();
+            const queryParams = new URLSearchParams(params).toString();
 
             const response = await api.get(`/api/admin/tickets/export?${queryParams}`, {
                 responseType: 'blob'
             });
 
-            const blob = new Blob([response.data], { type: 'application/vnd.ms-excel' });
+            const fileExt = formatType === 'csv' ? 'csv' : 'xls';
+            const blobType = formatType === 'csv' ? 'text/csv' : 'application/vnd.ms-excel';
+
+            const blob = new Blob([response.data], { type: blobType });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `Tickets_Export_${exportStartDate}_to_${exportEndDate}.xls`);
+            link.setAttribute('download', `Tickets_Export_${exportStartDate || 'all'}_to_${exportEndDate || 'all'}.${fileExt}`);
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
@@ -106,19 +125,29 @@ export const Tickets = () => {
             setTimeout(() => setSuccessMessage(''), 3000);
         } catch (e) {
             console.error('Error exporting tickets:', e);
-            alert('Failed to export tickets. Please ensure you have selected a valid date range.');
+            alert('Failed to export tickets.');
         }
     };
 
     // Reset pagination to first page when search query or filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, selectedStatusFilter, selectedPriorityFilter]);
+    }, [search, selectedStatusFilter, selectedPriorityFilter, selectedCategoryFilter, selectedBuildingFilter, selectedAssigneeFilter]);
 
     useEffect(() => {
         fetchTickets();
         fetchBuildings();
+        fetchCoworkers();
     }, []);
+
+    const fetchCoworkers = async () => {
+        try {
+            const res = await api.get('/api/admin/coworkers');
+            setCoworkers(Array.isArray(res.data) ? res.data : (res.data?.data || []));
+        } catch (e) {
+            console.error('Error fetching coworkers', e);
+        }
+    };
 
     useEffect(() => {
         if (selectedBuildingId) {
@@ -159,7 +188,21 @@ export const Tickets = () => {
             (t.subject || '').toLowerCase().includes(search.toLowerCase());
         const matchesStatus = selectedStatusFilter === 'All' || t.status === selectedStatusFilter;
         const matchesPriority = selectedPriorityFilter === 'All' || t.priority === selectedPriorityFilter;
-        return matchesSearch && matchesStatus && matchesPriority;
+        const matchesCategory = !selectedCategoryFilter || t.category === selectedCategoryFilter;
+        const matchesBuilding = !selectedBuildingFilter || t.propertyId === parseInt(selectedBuildingFilter);
+        const matchesAssignee = !selectedAssigneeFilter || t.assignedToId === parseInt(selectedAssigneeFilter);
+
+        let matchesDates = true;
+        if (exportStartDate) {
+            matchesDates = matchesDates && new Date(t.createdAtRaw || t.date) >= new Date(exportStartDate);
+        }
+        if (exportEndDate) {
+            const end = new Date(exportEndDate);
+            end.setHours(23, 59, 59, 999);
+            matchesDates = matchesDates && new Date(t.createdAtRaw || t.date) <= end;
+        }
+
+        return matchesSearch && matchesStatus && matchesPriority && matchesCategory && matchesBuilding && matchesAssignee && matchesDates;
     });
 
     const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
@@ -198,6 +241,8 @@ export const Tickets = () => {
         const form = e.target;
         const tenantId = form.tenantId.value;
         const tenantObj = tenants.find(t => t.id === parseInt(tenantId));
+        const categoryVal = form.category.value;
+        const assignedToVal = form.assignedToId ? form.assignedToId.value : '';
 
         try {
             const formData = new FormData();
@@ -207,19 +252,21 @@ export const Tickets = () => {
             formData.append('subject', form.subject.value);
             formData.append('description', form.description.value);
             formData.append('priority', form.priority.value);
+            formData.append('category', categoryVal);
+            if (assignedToVal) {
+                formData.append('assignedToId', assignedToVal);
+            }
 
             if (editingTicket) {
-                // For editing, we use a regular JSON put if no new files, but controller might expect form-data
-                // Simpler to stay consistent with form-data if we want file support, but for text only JSON is easier.
-                // However, the current createTicket uses multer.
-
                 await api.put(`/api/admin/tickets/${editingTicket.dbId}`, {
                     tenantId: parseInt(tenantId),
                     propertyId: parseInt(selectedBuildingId),
-                    unitId: tenantObj?.unitId,
+                    unitId: tenantObj?.unitId || editingTicket?.unitId,
                     subject: form.subject.value,
                     description: form.description.value,
                     priority: form.priority.value,
+                    category: categoryVal,
+                    assignedToId: assignedToVal ? parseInt(assignedToVal) : null
                 });
             } else {
                 // Handle Attachments only for new tickets for now (simple)
@@ -372,7 +419,7 @@ export const Tickets = () => {
                         </div>
                         <div className="flex flex-col">
                             <span className="text-2xl font-black text-slate-800 leading-none mb-1">
-                                {tickets.filter(t => t.status === 'Open').length}
+                                {tickets.filter(t => ['New', 'Open', 'Assigned', 'Waiting for Tenant', 'Waiting for Parts', 'On Hold'].includes(t.status)).length}
                             </span>
                             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Tickets</span>
                         </div>
@@ -398,7 +445,7 @@ export const Tickets = () => {
                         </div>
                         <div className="flex flex-col">
                             <span className="text-2xl font-black text-slate-800 leading-none mb-1">
-                                {tickets.filter(t => t.status === 'Resolved').length}
+                                {tickets.filter(t => ['Resolved', 'Completed', 'Closed'].includes(t.status)).length}
                             </span>
                             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Resolved</span>
                         </div>
@@ -453,11 +500,20 @@ export const Tickets = () => {
                         <Button
                             variant="secondary"
                             size="sm"
-                            onClick={handleExportCSV}
+                            onClick={() => handleExport('xlsx')}
+                            className="!border-indigo-200 !text-indigo-700 hover:!bg-indigo-50 font-bold"
+                        >
+                            <Download size={16} />
+                            Excel
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleExport('csv')}
                             className="!border-emerald-200 !text-emerald-700 hover:!bg-emerald-50 font-bold"
                         >
                             <Download size={16} />
-                            Export
+                            CSV
                         </Button>
                     </div>
 
@@ -477,18 +533,18 @@ export const Tickets = () => {
                                 onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                                 className={clsx(
                                     showFilterDropdown && "bg-slate-100 border-slate-300",
-                                    (selectedStatusFilter !== 'All' || selectedPriorityFilter !== 'All') && "border-indigo-300 text-indigo-600 bg-indigo-50/50"
+                                    (selectedStatusFilter !== 'All' || selectedPriorityFilter !== 'All' || selectedCategoryFilter !== '' || selectedBuildingFilter !== '' || selectedAssigneeFilter !== '') && "border-indigo-300 text-indigo-600 bg-indigo-50/50"
                                 )}
                             >
                                 <Filter size={16} />
                                 Filters
-                                {(selectedStatusFilter !== 'All' || selectedPriorityFilter !== 'All') && (
+                                {(selectedStatusFilter !== 'All' || selectedPriorityFilter !== 'All' || selectedCategoryFilter !== '' || selectedBuildingFilter !== '' || selectedAssigneeFilter !== '') && (
                                     <span className="ml-1 w-2 h-2 rounded-full bg-indigo-600"></span>
                                 )}
                             </Button>
                             
                             {showFilterDropdown && (
-                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-50 flex flex-col gap-3">
+                                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-50 flex flex-col gap-3 max-h-[80vh] overflow-y-auto">
                                     <div>
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Status</label>
                                         <select
@@ -497,9 +553,14 @@ export const Tickets = () => {
                                             className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-indigo-500"
                                         >
                                             <option value="All">All Statuses</option>
-                                            <option value="Open">Open</option>
+                                            <option value="New">New</option>
+                                            <option value="Assigned">Assigned</option>
                                             <option value="In Progress">In Progress</option>
-                                            <option value="Resolved">Resolved</option>
+                                            <option value="Waiting for Tenant">Waiting for Tenant</option>
+                                            <option value="Waiting for Parts">Waiting for Parts</option>
+                                            <option value="On Hold">On Hold</option>
+                                            <option value="Completed">Completed</option>
+                                            <option value="Closed">Closed</option>
                                         </select>
                                     </div>
                                     <div>
@@ -515,12 +576,70 @@ export const Tickets = () => {
                                             <option value="Low">Low</option>
                                         </select>
                                     </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Building</label>
+                                        <select
+                                            value={selectedBuildingFilter}
+                                            onChange={(e) => setSelectedBuildingFilter(e.target.value)}
+                                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-indigo-500"
+                                        >
+                                            <option value="">All Buildings</option>
+                                            {buildings.map(b => (
+                                                <option key={b.id} value={b.id.toString()}>{b.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Category</label>
+                                        <select
+                                            value={selectedCategoryFilter}
+                                            onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-indigo-500"
+                                        >
+                                            <option value="">All Categories</option>
+                                            <option value="General Maintenance">General Maintenance</option>
+                                            <option value="Plumbing">Plumbing</option>
+                                            <option value="Electrical">Electrical</option>
+                                            <option value="HVAC">HVAC</option>
+                                            <option value="Appliance">Appliance</option>
+                                            <option value="Cleaning">Cleaning</option>
+                                            <option value="Painting">Painting</option>
+                                            <option value="Carpentry">Carpentry</option>
+                                            <option value="Doors & Windows">Doors & Windows</option>
+                                            <option value="Locks & Keys">Locks & Keys</option>
+                                            <option value="Pest Control">Pest Control</option>
+                                            <option value="Landscaping">Landscaping</option>
+                                            <option value="Snow Removal">Snow Removal</option>
+                                            <option value="Inspection Deficiency">Inspection Deficiency</option>
+                                            <option value="Move-In">Move-In</option>
+                                            <option value="Move-Out">Move-Out</option>
+                                            <option value="Complaint">Complaint</option>
+                                            <option value="Emergency">Emergency</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Assigned Worker</label>
+                                        <select
+                                            value={selectedAssigneeFilter}
+                                            onChange={(e) => setSelectedAssigneeFilter(e.target.value)}
+                                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-indigo-500"
+                                        >
+                                            <option value="">All Workers</option>
+                                            {coworkers.map(c => (
+                                                <option key={c.id} value={c.id.toString()}>{c.name} ({c.title || 'Staff'})</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                     <div className="flex justify-between items-center pt-2 border-t border-slate-100">
                                         <button 
                                             type="button"
                                             onClick={() => {
                                                 setSelectedStatusFilter('All');
                                                 setSelectedPriorityFilter('All');
+                                                setSelectedCategoryFilter('');
+                                                setSelectedBuildingFilter('');
+                                                setSelectedAssigneeFilter('');
                                             }}
                                             className="text-[10px] font-bold text-indigo-600 hover:underline"
                                         >
@@ -751,6 +870,39 @@ export const Tickets = () => {
                                     </div>
                                 </div>
 
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Category</label>
+                                        <p className="font-medium text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 mt-1 inline-block text-xs font-bold text-indigo-600">{selectedTicket.category || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Priority</label>
+                                        <p className="font-medium text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 mt-1 inline-block text-xs font-bold text-rose-600">{selectedTicket.priority || 'Low'}</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+                                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block">Assignment Info</label>
+                                    <div className="grid grid-cols-2 gap-2 text-xs font-medium text-slate-600">
+                                        <div>
+                                            <span className="text-slate-400 font-semibold">Assigned To:</span> {selectedTicket.assignedToName || 'Unassigned'}
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-400 font-semibold">Assigned By:</span> {selectedTicket.assignedByName || 'N/A'}
+                                        </div>
+                                        {selectedTicket.assignedAt && (
+                                            <div className="col-span-2">
+                                                <span className="text-slate-400 font-semibold">Date Assigned:</span> {new Date(selectedTicket.assignedAt).toLocaleString()}
+                                            </div>
+                                        )}
+                                        {selectedTicket.completedAt && (
+                                            <div className="col-span-2 text-emerald-600 font-bold">
+                                                <span className="text-slate-400 font-semibold">Completed At:</span> {new Date(selectedTicket.completedAt).toLocaleString()}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 {selectedTicket.inspectorName !== 'N/A' && (
                                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                                         <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Reported By</label>
@@ -828,14 +980,14 @@ export const Tickets = () => {
                                 <div className="pt-4 border-t border-slate-100 flex flex-col gap-3">
                                     <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Update Status</label>
                                     <div className="flex flex-wrap gap-2">
-                                        {['Open', 'In Progress', 'Resolved'].map(status => (
+                                        {['New', 'Assigned', 'In Progress', 'Waiting for Tenant', 'Waiting for Parts', 'On Hold', 'Completed', 'Closed'].map(status => (
                                             <button
                                                 key={status}
                                                 onClick={() => updateStatus(selectedTicket.id, status)}
                                                 className={clsx(
-                                                    "px-4 py-2 rounded-lg text-sm font-medium transition-all border",
+                                                    "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border",
                                                     selectedTicket.status === status
-                                                        ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100"
+                                                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100"
                                                         : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
                                                 )}
                                             >
@@ -943,6 +1095,50 @@ export const Tickets = () => {
                                         <option value="Low">Low</option>
                                         <option value="Medium">Medium</option>
                                         <option value="High">High</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Category</label>
+                                    <select
+                                        name="category"
+                                        defaultValue={editingTicket?.category || ''}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-white"
+                                    >
+                                        <option value="">Select Category</option>
+                                        <option value="General Maintenance">General Maintenance</option>
+                                        <option value="Plumbing">Plumbing</option>
+                                        <option value="Electrical">Electrical</option>
+                                        <option value="HVAC">HVAC</option>
+                                        <option value="Appliance">Appliance</option>
+                                        <option value="Cleaning">Cleaning</option>
+                                        <option value="Painting">Painting</option>
+                                        <option value="Carpentry">Carpentry</option>
+                                        <option value="Doors & Windows">Doors & Windows</option>
+                                        <option value="Locks & Keys">Locks & Keys</option>
+                                        <option value="Pest Control">Pest Control</option>
+                                        <option value="Landscaping">Landscaping</option>
+                                        <option value="Snow Removal">Snow Removal</option>
+                                        <option value="Inspection Deficiency">Inspection Deficiency</option>
+                                        <option value="Move-In">Move-In</option>
+                                        <option value="Move-Out">Move-Out</option>
+                                        <option value="Complaint">Complaint</option>
+                                        <option value="Emergency">Emergency</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Assign Ticket</label>
+                                    <select
+                                        name="assignedToId"
+                                        defaultValue={editingTicket?.assignedToId || ''}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-white"
+                                    >
+                                        <option value="">Unassigned</option>
+                                        {coworkers.map(c => (
+                                            <option key={c.id} value={c.id.toString()}>{c.name} ({c.title || 'Staff'})</option>
+                                        ))}
                                     </select>
                                 </div>
 
