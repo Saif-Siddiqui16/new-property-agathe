@@ -44,9 +44,14 @@ const getTicketAge = (ticket) => {
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     if (isDone) {
-        return diffDays === 0 ? "Completed today" : `Completed in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+        const isActuallyToday = end.toDateString() === new Date().toDateString();
+        if (isActuallyToday) {
+            return "Completed today";
+        }
+        return diffDays === 0 ? "Completed same day" : `Completed in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
     } else {
-        return diffDays === 0 ? "Created today" : `${diffDays} day${diffDays > 1 ? 's' : ''} open`;
+        const isActuallyCreatedToday = start.toDateString() === new Date().toDateString();
+        return isActuallyCreatedToday ? "Created today" : `${diffDays} day${diffDays > 1 ? 's' : ''} open`;
     }
 };
 
@@ -75,6 +80,8 @@ export const Tickets = () => {
     const [exportStartDate, setExportStartDate] = useState('');
     const [exportEndDate, setExportEndDate] = useState('');
     const [coworkers, setCoworkers] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [showManageCategoriesModal, setShowManageCategoriesModal] = useState(false);
 
     // Print State
     const [selectedForPrint, setSelectedForPrint] = useState(new Set());
@@ -138,6 +145,7 @@ export const Tickets = () => {
         fetchTickets();
         fetchBuildings();
         fetchCoworkers();
+        fetchCategories();
     }, []);
 
     const fetchCoworkers = async () => {
@@ -146,6 +154,70 @@ export const Tickets = () => {
             setCoworkers(Array.isArray(res.data) ? res.data : (res.data?.data || []));
         } catch (e) {
             console.error('Error fetching coworkers', e);
+        }
+    };
+
+    const fetchCategories = async () => {
+        try {
+            const res = await api.get('/api/admin/ticket-categories');
+            setCategories(Array.isArray(res.data) ? res.data : (res.data?.data || []));
+        } catch (e) {
+            console.error('Error fetching categories', e);
+        }
+    };
+
+    const handleAddCategory = async (name) => {
+        if (!name || !name.trim()) return;
+        try {
+            await api.post('/api/admin/ticket-categories', { name });
+            fetchCategories();
+        } catch (e) {
+            alert(e.response?.data?.message || 'Failed to add category');
+        }
+    };
+
+    const handleDeleteCategory = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this category?')) return;
+        try {
+            await api.delete(`/api/admin/ticket-categories/${id}`);
+            fetchCategories();
+        } catch (e) {
+            alert(e.response?.data?.message || 'Failed to delete category');
+        }
+    };
+
+    const handleAddCoworker = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const firstName = form.firstName.value;
+        const lastName = form.lastName.value;
+        const email = form.email.value;
+        const phone = form.phone.value;
+        const title = form.title.value;
+
+        try {
+            await api.post('/api/admin/coworkers', {
+                firstName,
+                lastName,
+                email,
+                phone,
+                title,
+                permissions: []
+            });
+            fetchCoworkers();
+            form.reset();
+        } catch (e) {
+            alert(e.response?.data?.message || 'Failed to add coworker');
+        }
+    };
+
+    const handleDeleteCoworker = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this worker?')) return;
+        try {
+            await api.delete(`/api/admin/coworkers/${id}`);
+            fetchCoworkers();
+        } catch (e) {
+            alert(e.response?.data?.message || 'Failed to delete worker');
         }
     };
 
@@ -479,42 +551,47 @@ export const Tickets = () => {
                         </div>
 
                         {/* Export Operational Date Range and Button */}
-                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">From:</span>
-                            <input
-                                type="date"
-                                value={exportStartDate}
-                                onChange={(e) => setExportStartDate(e.target.value)}
-                                className="bg-transparent border-none outline-none text-xs font-semibold text-slate-700 cursor-pointer"
-                            />
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">From:</span>
+                                <input
+                                    type="date"
+                                    value={exportStartDate}
+                                    onChange={(e) => setExportStartDate(e.target.value)}
+                                    className="bg-transparent border-none outline-none text-xs font-semibold text-slate-700 cursor-pointer"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">To:</span>
+                                <input
+                                    type="date"
+                                    value={exportEndDate}
+                                    onChange={(e) => setExportEndDate(e.target.value)}
+                                    className="bg-transparent border-none outline-none text-xs font-semibold text-slate-700 cursor-pointer"
+                                />
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">To:</span>
-                            <input
-                                type="date"
-                                value={exportEndDate}
-                                onChange={(e) => setExportEndDate(e.target.value)}
-                                className="bg-transparent border-none outline-none text-xs font-semibold text-slate-700 cursor-pointer"
-                            />
+
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleExport('xlsx')}
+                                className="!border-indigo-200 !text-indigo-700 hover:!bg-indigo-50 font-bold"
+                            >
+                                <Download size={16} />
+                                Excel
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleExport('csv')}
+                                className="!border-emerald-200 !text-emerald-700 hover:!bg-emerald-50 font-bold"
+                            >
+                                <Download size={16} />
+                                CSV
+                            </Button>
                         </div>
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleExport('xlsx')}
-                            className="!border-indigo-200 !text-indigo-700 hover:!bg-indigo-50 font-bold"
-                        >
-                            <Download size={16} />
-                            Excel
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleExport('csv')}
-                            className="!border-emerald-200 !text-emerald-700 hover:!bg-emerald-50 font-bold"
-                        >
-                            <Download size={16} />
-                            CSV
-                        </Button>
                     </div>
 
                     <div className="flex gap-2">
@@ -597,25 +674,9 @@ export const Tickets = () => {
                                             className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-indigo-500"
                                         >
                                             <option value="">All Categories</option>
-                                            <option value="General Maintenance">General Maintenance</option>
-                                            <option value="Plumbing">Plumbing</option>
-                                            <option value="Electrical">Electrical</option>
-                                            <option value="HVAC">HVAC</option>
-                                            <option value="Appliance">Appliance</option>
-                                            <option value="Cleaning">Cleaning</option>
-                                            <option value="Painting">Painting</option>
-                                            <option value="Carpentry">Carpentry</option>
-                                            <option value="Doors & Windows">Doors & Windows</option>
-                                            <option value="Locks & Keys">Locks & Keys</option>
-                                            <option value="Pest Control">Pest Control</option>
-                                            <option value="Landscaping">Landscaping</option>
-                                            <option value="Snow Removal">Snow Removal</option>
-                                            <option value="Inspection Deficiency">Inspection Deficiency</option>
-                                            <option value="Move-In">Move-In</option>
-                                            <option value="Move-Out">Move-Out</option>
-                                            <option value="Complaint">Complaint</option>
-                                            <option value="Emergency">Emergency</option>
-                                            <option value="Other">Other</option>
+                                            {categories.map(c => (
+                                                <option key={c.id || c.name} value={c.name}>{c.name}</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div>
@@ -657,6 +718,9 @@ export const Tickets = () => {
                             )}
                         </div>
 
+                        <Button variant="secondary" size="sm" onClick={() => setShowManageCategoriesModal(true)} className="!border-indigo-200 !text-indigo-700 hover:!bg-indigo-50 font-bold">
+                            Manage Categories
+                        </Button>
                         {hasPermission('Tickets', 'add') && (
                             <Button variant="primary" size="sm" onClick={() => setShowAddModal(true)}>
                                 <Plus size={16} />
@@ -843,9 +907,14 @@ export const Tickets = () => {
                                                 const diffTime = endZero - startZero;
                                                 const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                                                 if (selectedTicket.status === 'Resolved') {
-                                                    return diffDays === 0 ? "Resolved today" : `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+                                                    const isActuallyToday = end.toDateString() === new Date().toDateString();
+                                                    if (isActuallyToday) {
+                                                        return "Resolved today";
+                                                    }
+                                                    return diffDays === 0 ? "Resolved same day" : `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
                                                 } else {
-                                                    return diffDays === 0 ? "Created today" : `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+                                                    const isActuallyCreatedToday = start.toDateString() === new Date().toDateString();
+                                                    return isActuallyCreatedToday ? "Created today" : `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
                                                 }
                                             })()}
                                         </p>
@@ -1106,30 +1175,14 @@ export const Tickets = () => {
                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-white"
                                     >
                                         <option value="">Select Category</option>
-                                        <option value="General Maintenance">General Maintenance</option>
-                                        <option value="Plumbing">Plumbing</option>
-                                        <option value="Electrical">Electrical</option>
-                                        <option value="HVAC">HVAC</option>
-                                        <option value="Appliance">Appliance</option>
-                                        <option value="Cleaning">Cleaning</option>
-                                        <option value="Painting">Painting</option>
-                                        <option value="Carpentry">Carpentry</option>
-                                        <option value="Doors & Windows">Doors & Windows</option>
-                                        <option value="Locks & Keys">Locks & Keys</option>
-                                        <option value="Pest Control">Pest Control</option>
-                                        <option value="Landscaping">Landscaping</option>
-                                        <option value="Snow Removal">Snow Removal</option>
-                                        <option value="Inspection Deficiency">Inspection Deficiency</option>
-                                        <option value="Move-In">Move-In</option>
-                                        <option value="Move-Out">Move-Out</option>
-                                        <option value="Complaint">Complaint</option>
-                                        <option value="Emergency">Emergency</option>
-                                        <option value="Other">Other</option>
+                                        {categories.map(c => (
+                                            <option key={c.id || c.name} value={c.name}>{c.name}</option>
+                                        ))}
                                     </select>
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Assign Ticket</label>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Assign To</label>
                                     <select
                                         name="assignedToId"
                                         defaultValue={editingTicket?.assignedToId || ''}
@@ -1240,6 +1293,54 @@ export const Tickets = () => {
                             <div className="mt-8 flex gap-3">
                                 <Button variant="secondary" className="flex-1" onClick={() => setViewingTenantDetails(null)}>Close</Button>
                                 <Button variant="primary" className="flex-1">View Full Profile</Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showManageCategoriesModal && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] animate-in fade-in duration-200">
+                        <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-slate-800">Manage Categories</h3>
+                                <button onClick={() => setShowManageCategoriesModal(false)} className="text-slate-400 hover:text-slate-600">
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={(e) => {
+                                e.preventDefault();
+                                const input = e.target.categoryName;
+                                handleAddCategory(input.value);
+                                input.value = '';
+                            }} className="flex gap-2 mb-6">
+                                <input
+                                    name="categoryName"
+                                    required
+                                    placeholder="New category name..."
+                                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 text-sm font-medium"
+                                />
+                                <Button type="submit" variant="primary" size="sm">Add</Button>
+                            </form>
+
+                            <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto pr-1">
+                                {categories.map(c => (
+                                    <div key={c.id || c.name} className="flex justify-between items-center py-3">
+                                        <span className="text-sm font-semibold text-slate-700">{c.name}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteCategory(c.id)}
+                                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                            title="Delete Category"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="mt-8 flex justify-end">
+                                <Button variant="secondary" onClick={() => setShowManageCategoriesModal(false)}>Close</Button>
                             </div>
                         </div>
                     </div>
