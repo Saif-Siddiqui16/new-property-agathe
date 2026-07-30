@@ -81,7 +81,10 @@ export const Tickets = () => {
     const [exportEndDate, setExportEndDate] = useState('');
     const [coworkers, setCoworkers] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [assignees, setAssignees] = useState([]);
     const [showManageCategoriesModal, setShowManageCategoriesModal] = useState(false);
+    const [showManageAssigneesModal, setShowManageAssigneesModal] = useState(false);
+    const [tempAssignees, setTempAssignees] = useState([]);
 
     // Print State
     const [selectedForPrint, setSelectedForPrint] = useState(new Set());
@@ -146,6 +149,7 @@ export const Tickets = () => {
         fetchBuildings();
         fetchCoworkers();
         fetchCategories();
+        fetchAssignees();
     }, []);
 
     const fetchCoworkers = async () => {
@@ -166,6 +170,15 @@ export const Tickets = () => {
         }
     };
 
+    const fetchAssignees = async () => {
+        try {
+            const res = await api.get('/api/admin/ticket-assignees');
+            setAssignees(Array.isArray(res.data) ? res.data : (res.data?.data || []));
+        } catch (e) {
+            console.error('Error fetching assignees', e);
+        }
+    };
+
     const handleAddCategory = async (name) => {
         if (!name || !name.trim()) return;
         try {
@@ -183,6 +196,44 @@ export const Tickets = () => {
             fetchCategories();
         } catch (e) {
             alert(e.response?.data?.message || 'Failed to delete category');
+        }
+    };
+
+    const handleAddAssignee = async (name) => {
+        if (!name || !name.trim()) return;
+        try {
+            await api.post('/api/admin/ticket-assignees', { name });
+            fetchAssignees();
+        } catch (e) {
+            alert(e.response?.data?.message || 'Failed to add assignee');
+        }
+    };
+
+    const handleDeleteAssignee = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this assignee?')) return;
+        try {
+            await api.delete(`/api/admin/ticket-assignees/${id}`);
+            fetchAssignees();
+        } catch (e) {
+            alert(e.response?.data?.message || 'Failed to delete assignee');
+        }
+    };
+
+    useEffect(() => {
+        if (showManageAssigneesModal) {
+            setTempAssignees(coworkers.filter(c => c.isAssignee).map(c => c.id));
+        }
+    }, [showManageAssigneesModal, coworkers]);
+
+    const handleSaveAssignees = async () => {
+        try {
+            await api.post('/api/admin/active-assignees', { assigneeIds: tempAssignees });
+            await fetchCoworkers();
+            setShowManageAssigneesModal(false);
+            setSuccessMessage('Assignees updated successfully!');
+            setTimeout(() => setSuccessMessage(''), 3000);
+        } catch (e) {
+            alert(e.response?.data?.message || 'Failed to update assignees');
         }
     };
 
@@ -262,7 +313,7 @@ export const Tickets = () => {
         const matchesPriority = selectedPriorityFilter === 'All' || t.priority === selectedPriorityFilter;
         const matchesCategory = !selectedCategoryFilter || t.category === selectedCategoryFilter;
         const matchesBuilding = !selectedBuildingFilter || t.propertyId === parseInt(selectedBuildingFilter);
-        const matchesAssignee = !selectedAssigneeFilter || t.assignedToId === parseInt(selectedAssigneeFilter);
+        const matchesAssignee = !selectedAssigneeFilter || t.assignedToName === selectedAssigneeFilter || t.assignedToId === parseInt(selectedAssigneeFilter);
 
         let matchesDates = true;
         if (exportStartDate) {
@@ -687,8 +738,8 @@ export const Tickets = () => {
                                             className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-indigo-500"
                                         >
                                             <option value="">All Workers</option>
-                                            {coworkers.map(c => (
-                                                <option key={c.id} value={c.id.toString()}>{c.name} ({c.title || 'Staff'})</option>
+                                            {assignees.map(a => (
+                                                <option key={a.id} value={a.name}>{a.name}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -720,6 +771,9 @@ export const Tickets = () => {
 
                         <Button variant="secondary" size="sm" onClick={() => setShowManageCategoriesModal(true)} className="!border-indigo-200 !text-indigo-700 hover:!bg-indigo-50 font-bold">
                             Manage Categories
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={() => setShowManageAssigneesModal(true)} className="!border-indigo-200 !text-indigo-700 hover:!bg-indigo-50 font-bold">
+                            Manage Assignees
                         </Button>
                         {hasPermission('Tickets', 'add') && (
                             <Button variant="primary" size="sm" onClick={() => setShowAddModal(true)}>
@@ -1185,12 +1239,12 @@ export const Tickets = () => {
                                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Assign To</label>
                                     <select
                                         name="assignedToId"
-                                        defaultValue={editingTicket?.assignedToId || ''}
+                                        defaultValue={editingTicket?.assignedToNameString || editingTicket?.assignedToId || ''}
                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-white"
                                     >
                                         <option value="">Unassigned</option>
-                                        {coworkers.map(c => (
-                                            <option key={c.id} value={c.id.toString()}>{c.name} ({c.title || 'Staff'})</option>
+                                        {assignees.map(a => (
+                                            <option key={a.id} value={a.name}>{a.name}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -1341,6 +1395,57 @@ export const Tickets = () => {
 
                             <div className="mt-8 flex justify-end">
                                 <Button variant="secondary" onClick={() => setShowManageCategoriesModal(false)}>Close</Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showManageAssigneesModal && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] animate-in fade-in duration-200">
+                        <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-slate-800">Manage Assignees</h3>
+                                <button onClick={() => setShowManageAssigneesModal(false)} className="text-slate-400 hover:text-slate-600">
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={(e) => {
+                                e.preventDefault();
+                                const input = e.target.assigneeName;
+                                handleAddAssignee(input.value);
+                                input.value = '';
+                            }} className="flex gap-2 mb-6">
+                                <input
+                                    name="assigneeName"
+                                    required
+                                    placeholder="New assignee name..."
+                                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 text-sm font-medium"
+                                />
+                                <Button type="submit" variant="primary" size="sm">Add</Button>
+                            </form>
+
+                            <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto pr-1">
+                                {assignees.map(a => (
+                                    <div key={a.id} className="flex justify-between items-center py-3">
+                                        <span className="text-sm font-semibold text-slate-700">{a.name}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteAssignee(a.id)}
+                                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                            title="Delete Assignee"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {assignees.length === 0 && (
+                                    <div className="py-4 text-center text-sm text-slate-500">No assignees found. Add one above.</div>
+                                )}
+                            </div>
+
+                            <div className="mt-8 flex justify-end">
+                                <Button variant="secondary" onClick={() => setShowManageAssigneesModal(false)}>Close</Button>
                             </div>
                         </div>
                     </div>
