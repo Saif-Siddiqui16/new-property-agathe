@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MainLayout } from '../layouts/MainLayout';
-import { Eye, CreditCard, X, Search, Filter } from 'lucide-react';
+import { Eye, CreditCard, X, Search, Filter, Mail } from 'lucide-react';
 import { Button } from '../components/Button';
 import api from '../api/client';
 import { hasPermission } from '../utils/permissions';
@@ -65,6 +65,32 @@ const OutstandingDues = () => {
   // Pagination Logic
   const totalPages = Math.ceil(filteredDues.length / itemsPerPage);
   const currentDues = filteredDues.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const [sendingReminderId, setSendingReminderId] = useState(null);
+
+  const handleSendReminder = async (dueItem) => {
+    if (!dueItem || !dueItem.email) {
+      alert('Tenant does not have a configured email address.');
+      return;
+    }
+
+    const confirmSend = window.confirm(
+      `Are you sure you want to send a rent reminder email to ${dueItem.tenant} for Unit ${dueItem.unit}?`
+    );
+    if (!confirmSend) return;
+
+    try {
+      setSendingReminderId(dueItem.id);
+      const res = await api.post(`/api/admin/outstanding-dues/${dueItem.id}/send-reminder`);
+      alert(res.data?.message || `Rent reminder email sent successfully to ${dueItem.tenant}.`);
+      fetchDues();
+    } catch (error) {
+      console.error('Error sending rent reminder:', error);
+      alert(error.response?.data?.message || 'Failed to send rent reminder email.');
+    } finally {
+      setSendingReminderId(null);
+    }
+  };
 
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -158,7 +184,15 @@ const OutstandingDues = () => {
                   currentDues.map((d) => (
                     <tr key={d.invoice} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-4 text-sm text-slate-700 font-mono font-medium whitespace-nowrap">{d.invoice}</td>
-                      <td className="p-4 text-sm text-slate-700 whitespace-nowrap">{d.tenant}</td>
+                      <td className="p-4 text-sm text-slate-700 whitespace-nowrap">
+                        <div className="font-medium">{d.tenant}</div>
+                        {d.lastReminderSent && (
+                          <div className="text-[10px] text-slate-400 font-semibold mt-1 flex items-center gap-1">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            Reminder sent: {d.lastReminderSent}
+                          </div>
+                        )}
+                      </td>
                       <td className="p-4 text-sm text-slate-700 whitespace-nowrap">{d.unit}</td>
                       <td className="p-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
@@ -190,6 +224,20 @@ const OutstandingDues = () => {
                           <button onClick={() => setSelectedInvoice(d)} className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-lg transition-all">
                             <Eye size={16} />
                           </button>
+                           {hasPermission('Outstanding Dues', 'add') && (
+                            <button
+                              onClick={() => handleSendReminder(d)}
+                              disabled={sendingReminderId === d.id}
+                              title="Send Email Reminder"
+                              className={`p-1.5 rounded-lg transition-all ${
+                                sendingReminderId === d.id
+                                  ? 'text-slate-300 bg-slate-50 cursor-not-allowed'
+                                  : 'text-slate-400 hover:text-blue-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              <Mail size={16} className={sendingReminderId === d.id ? 'animate-pulse' : ''} />
+                            </button>
+                          )}
                           {hasPermission('Outstanding Dues', 'add') && (
                             <button
                               onClick={() => {
