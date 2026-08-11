@@ -209,7 +209,8 @@ const MoveInDashboard = () => {
                 } else if (item.status.includes('CONSTRUCTION')) {
                     navigate('/unit-readiness');
                 } else {
-                    handleToggleRequirement(item.id, 'Process', true);
+                    const isProcessed = item.missingItems ? !item.missingItems.includes('Process') : true;
+                    handleToggleRequirement(item.id, 'Process', isProcessed);
                 }
             } else if (item.status === 'REQUIREMENTS_PENDING') {
                 handleOverride(item.id);
