@@ -67,21 +67,28 @@ const OutstandingDues = () => {
   const currentDues = filteredDues.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const [sendingReminderId, setSendingReminderId] = useState(null);
+  const [languageModal, setLanguageModal] = useState({ open: false, dueItem: null });
+  const [selectedLanguage, setSelectedLanguage] = useState('both');
 
-  const handleSendReminder = async (dueItem) => {
+  const handleSendReminder = (dueItem) => {
     if (!dueItem || !dueItem.email) {
       alert('Tenant does not have a configured email address.');
       return;
     }
+    // Open the language-selection modal instead of window.confirm
+    setSelectedLanguage('both');
+    setLanguageModal({ open: true, dueItem });
+  };
 
-    const confirmSend = window.confirm(
-      `Are you sure you want to send a rent reminder email to ${dueItem.tenant} for Unit ${dueItem.unit}?`
-    );
-    if (!confirmSend) return;
-
+  const handleConfirmSendReminder = async () => {
+    const dueItem = languageModal.dueItem;
+    if (!dueItem) return;
+    setLanguageModal({ open: false, dueItem: null });
     try {
       setSendingReminderId(dueItem.id);
-      const res = await api.post(`/api/admin/outstanding-dues/${dueItem.id}/send-reminder`);
+      const res = await api.post(`/api/admin/outstanding-dues/${dueItem.id}/send-reminder`, {
+        language: selectedLanguage
+      });
       alert(res.data?.message || `Rent reminder email sent successfully to ${dueItem.tenant}.`);
       fetchDues();
     } catch (error) {
@@ -379,6 +386,76 @@ const OutstandingDues = () => {
                 <Button className="flex-[2] rounded-2xl shadow-xl shadow-primary-100" onClick={handleRecordPayment}>
                   Confirm Payment
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* LANGUAGE SELECTION MODAL */}
+        {languageModal.open && languageModal.dueItem && (
+          <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[120] backdrop-blur-md animate-in fade-in px-4">
+            <div className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-slate-200">
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                <h3 className="text-lg font-black text-slate-900 uppercase italic tracking-tight flex items-center gap-2">
+                  <Mail size={18} className="text-blue-500" />
+                  Send Reminder
+                </h3>
+                <button
+                  onClick={() => setLanguageModal({ open: false, dueItem: null })}
+                  className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <p className="text-sm text-slate-500 mb-5">
+                Sending reminder to <span className="font-bold text-slate-800">{languageModal.dueItem.tenant}</span> — Unit <span className="font-bold text-slate-800">{languageModal.dueItem.unit}</span>
+              </p>
+
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Email Language</p>
+              <div className="flex flex-col gap-2 mb-8">
+                {[
+                  { value: 'both', label: '🇫🇷 French + 🇬🇧 English (Both)', desc: 'French first, then English' },
+                  { value: 'fr',   label: '🇫🇷 French only',               desc: 'Français uniquement' },
+                  { value: 'en',   label: '🇬🇧 English only',              desc: 'English only' },
+                ].map(opt => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-start gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      selectedLanguage === opt.value
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-slate-100 bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="emailLanguage"
+                      value={opt.value}
+                      checked={selectedLanguage === opt.value}
+                      onChange={() => setSelectedLanguage(opt.value)}
+                      className="mt-0.5 accent-blue-600"
+                    />
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">{opt.label}</p>
+                      <p className="text-[11px] text-slate-400">{opt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setLanguageModal({ open: false, dueItem: null })}
+                  className="flex-1 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmSendReminder}
+                  className="flex-[2] py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                >
+                  Send Email
+                </button>
               </div>
             </div>
           </div>
