@@ -3,7 +3,7 @@ import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { PaymentModal } from '../components/PaymentModal';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 import { hasPermission } from '../utils/permissions';
 
 const MOCK_TRANSACTIONS = [
@@ -69,6 +69,28 @@ export const Accounting = () => {
     // Sort transactions by date descending for the list display
     const currentItems = transactions.slice(indexOfFirstItem, indexOfLastItem);
     const totalPages = Math.ceil(transactions.length / itemsPerPage);
+
+    const getPageNumbers = () => {
+        const pages = [];
+        const maxVisible = 5;
+        if (totalPages <= maxVisible) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+            let start = Math.max(1, currentPage - 2);
+            let end = Math.min(totalPages, currentPage + 2);
+            
+            if (start === 1) {
+                end = maxVisible;
+            } else if (end === totalPages) {
+                start = totalPages - maxVisible + 1;
+            }
+            
+            for (let i = start; i <= end; i++) {
+                pages.push(i);
+            }
+        }
+        return pages;
+    };
 
     return (
         <DashboardLayout title="Accounting & Ledger">
@@ -152,19 +174,43 @@ export const Accounting = () => {
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                         Page {currentPage} of {totalPages || 1}
                     </p>
-                    <div className="flex gap-1.5">
-                        {Array.from({ length: totalPages || 1 }, (_, i) => i + 1).map((page) => (
-                            <button
-                                key={page}
-                                onClick={() => setCurrentPage(page)}
-                                className={`w-8 h-8 rounded-lg text-xs font-black transition-all border ${currentPage === page
-                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className={`p-2 rounded-lg border text-xs font-black transition-all ${
+                                currentPage === 1
+                                    ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
                                     : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-500 hover:text-indigo-600'
-                                    }`}
-                            >
-                                {page}
-                            </button>
-                        ))}
+                            }`}
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <div className="flex gap-1.5">
+                            {getPageNumbers().map((page) => (
+                                <button
+                                    key={page}
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`w-8 h-8 rounded-lg text-xs font-black transition-all border ${currentPage === page
+                                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-500 hover:text-indigo-600'
+                                        }`}
+                                >
+                                    {page}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                            className={`p-2 rounded-lg border text-xs font-black transition-all ${
+                                currentPage === totalPages
+                                    ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-500 hover:text-indigo-600'
+                            }`}
+                        >
+                            <ChevronRight size={16} />
+                        </button>
                     </div>
                 </div>
             </Card>

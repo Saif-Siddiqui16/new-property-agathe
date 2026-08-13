@@ -102,13 +102,15 @@ const OutstandingDues = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: '', paymentMethod: 'Cash' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleRecordPayment = async () => {
-    if (!selectedInvoice || !paymentForm.amount) {
+    if (!selectedInvoice || !paymentForm.amount || isSubmitting) {
       alert('Please enter a valid amount');
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await api.post('/api/admin/payments', {
         invoiceId: selectedInvoice.id,
@@ -124,6 +126,8 @@ const OutstandingDues = () => {
     } catch (error) {
       console.error('Error recording payment:', error);
       alert('Failed to record payment');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -383,8 +387,12 @@ const OutstandingDues = () => {
                 <Button variant="secondary" className="flex-1 rounded-2xl" onClick={() => setShowPaymentModal(false)}>
                   Cancel
                 </Button>
-                <Button className="flex-[2] rounded-2xl shadow-xl shadow-primary-100" onClick={handleRecordPayment}>
-                  Confirm Payment
+                <Button 
+                  className="flex-[2] rounded-2xl shadow-xl shadow-primary-100" 
+                  onClick={handleRecordPayment}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Recording...' : 'Confirm Payment'}
                 </Button>
               </div>
             </div>
