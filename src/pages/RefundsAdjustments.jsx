@@ -44,6 +44,8 @@ const RefundsAdjustments = () => {
   const [uploading, setUploading] = useState(false);
   const [pendingRefunds, setPendingRefunds] = useState([]);
   const [loadingPending, setLoadingPending] = useState(false);
+  const [allPendingDeposits, setAllPendingDeposits] = useState([]);
+  const [allPendingDepositsTotal, setAllPendingDepositsTotal] = useState(0);
   const [success, setSuccess] = useState(false);
 
   const location = useLocation();
@@ -79,6 +81,8 @@ const RefundsAdjustments = () => {
     try {
       const res = await api.get('/api/admin/dashboard/stats');
       setPendingRefunds(res.data.pendingRefunds || []);
+      setAllPendingDeposits(res.data.allPendingDepositsList || []);
+      setAllPendingDepositsTotal(res.data.allPendingDepositsTotal || 0);
     } catch (e) {
       console.error('Error fetching pending refunds:', e);
     } finally {
@@ -325,6 +329,85 @@ const RefundsAdjustments = () => {
                 </tbody>
                 </table>
             </div>
+        </div>
+
+        {/* GRAND TOTAL BANNER */}
+        <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-2xl shadow-lg shadow-indigo-200 p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <DollarSign size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="text-indigo-100 text-xs font-bold uppercase tracking-widest">Total Deposits Pending Payout</p>
+              <p className="text-white text-2xl font-black tracking-tight font-mono">
+                $ {allPendingDepositsTotal.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-indigo-100 text-xs font-bold uppercase tracking-widest">Tenants Remaining</p>
+            <p className="text-white text-3xl font-black">{allPendingDeposits.length}</p>
+          </div>
+        </div>
+
+        {/* ALL PENDING DEPOSITS — SYSTEM-WIDE */}
+        <div className="bg-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.06)] border-t-[4px] border-indigo-500 overflow-hidden mb-4">
+          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
+                <PieChart size={18} className="text-indigo-500" /> All Pending Deposits (System-Wide)
+              </h3>
+              <p className="text-xs text-gray-400 font-medium mt-0.5 italic">All tenants with a security deposit not yet fully refunded — active and moved out.</p>
+            </div>
+            <div className="px-3 py-1 bg-indigo-50 rounded-full border border-indigo-100">
+              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                {allPendingDeposits.length} Tenants
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto overflow-y-auto max-h-[350px]">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 bg-white z-10 shadow-sm">
+                <tr className="border-b border-gray-100">
+                  <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tenant Name</th>
+                  <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Building / Unit</th>
+                  <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Paid Deposit</th>
+                  <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Lease Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {allPendingDeposits.map((item) => (
+                  <tr key={`${item.tenantId}-${item.unitId}-${item.id}`} className="group hover:bg-slate-50 transition-colors">
+                    <td className="p-4 text-sm font-bold text-slate-700">{item.tenantName}</td>
+                    <td className="p-4 text-xs font-semibold text-slate-500">{item.building} / {item.unitNumber}</td>
+                    <td className="p-4 text-center">
+                      <span className="text-sm font-black text-emerald-600">$ {item.depositAmount.toLocaleString('en-CA')}</span>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        item.leaseStatus === 'Active'
+                          ? 'bg-emerald-50 text-emerald-600'
+                          : item.leaseStatus === 'Moved Out'
+                          ? 'bg-amber-50 text-amber-600'
+                          : 'bg-slate-100 text-slate-400'
+                      }`}>{item.leaseStatus}</span>
+                    </td>
+                  </tr>
+                ))}
+                {allPendingDeposits.length === 0 && !loadingPending && (
+                  <tr>
+                    <td colSpan="4" className="py-12 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <CheckCircle2 size={32} className="text-emerald-100" />
+                        <span className="text-sm font-bold text-slate-300 italic tracking-tight">No pending deposits in the system.</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="flex justify-end pt-2">
