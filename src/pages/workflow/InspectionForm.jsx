@@ -356,6 +356,41 @@ const InspectionForm = () => {
         return true;
     };
 
+    const handleSaveProgress = async () => {
+        try {
+            setSaving(true);
+            const formattedResponses = Object.keys(responses).map(qId => {
+                const room = rooms.find(r => r.questions.some(q => q.id.toString() === qId));
+                const question = room?.questions.find(q => q.id.toString() === qId);
+                return {
+                    id: responses[qId].id,
+                    questionId: parseInt(qId),
+                    question: question?.text || 'Unknown',
+                    response: responses[qId].status,
+                    notes: responses[qId].notes || '',
+                    annotation: responses[qId].annotation || '',
+                    photo: responses[qId].photo || null,
+                    photos: responses[qId].photos || [],
+                    annotatedPhoto: responses[qId].annotatedPhoto || null
+                };
+            });
+
+            const res = await api.put(`/api/admin/workflow/inspections/${id}`, {
+                responses: formattedResponses
+            });
+
+            if (res.data.success) {
+                alert('Progress saved. You can continue this inspection later.');
+                navigate('/admin/workflow/inspections');
+            }
+        } catch (error) {
+            console.error('Save progress error:', error);
+            alert('Error saving: ' + (error.response?.data?.message || error.message));
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleFinalize = async () => {
         if (!validateForm()) return;
 
@@ -810,15 +845,27 @@ const InspectionForm = () => {
                                                 <p className="text-indigo-100 text-sm font-medium">Clicking finalize will lock all records and generate the report.</p>
                                             </div>
                                         </div>
-                                        <button 
-                                            onClick={handleFinalize}
-                                            disabled={saving || (!isEditMode && inspection.status === 'COMPLETED')}
-                                            className={`px-12 py-5 rounded-[24px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3
-                                                ${(saving || (!isEditMode && inspection.status === 'COMPLETED')) ? 'bg-white/10 text-white/50 cursor-not-allowed shadow-none' : 'bg-white text-indigo-600 hover:bg-indigo-50 active:scale-95 shadow-indigo-900/20'}`}
-                                        >
-                                            {saving ? 'Processing...' : inspection.status === 'COMPLETED' ? 'Save Changes' : 'Finalize & Close'}
-                                            <CheckCircle2 size={20} />
-                                        </button>
+                                        <div className="flex items-center gap-4">
+                                            {inspection.status === 'DRAFT' && (
+                                                <button
+                                                    onClick={handleSaveProgress}
+                                                    disabled={saving}
+                                                    className={`px-8 py-5 rounded-[24px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 border-2 border-white/40 text-white hover:bg-white/10 active:scale-95 ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                >
+                                                    <Save size={20} />
+                                                    {saving ? 'Saving...' : 'Save & Exit'}
+                                                </button>
+                                            )}
+                                            <button 
+                                                onClick={handleFinalize}
+                                                disabled={saving || (!isEditMode && inspection.status === 'COMPLETED')}
+                                                className={`px-12 py-5 rounded-[24px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3
+                                                    ${(saving || (!isEditMode && inspection.status === 'COMPLETED')) ? 'bg-white/10 text-white/50 cursor-not-allowed shadow-none' : 'bg-white text-indigo-600 hover:bg-indigo-50 active:scale-95 shadow-indigo-900/20'}`}
+                                            >
+                                                {saving ? 'Processing...' : inspection.status === 'COMPLETED' ? 'Save Changes' : 'Finalize & Close'}
+                                                <CheckCircle2 size={20} />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </section>

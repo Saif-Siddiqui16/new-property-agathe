@@ -13,7 +13,8 @@ import {
     User,
     ClipboardList,
     Download,
-    Eye
+    Eye,
+    Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -73,6 +74,19 @@ const InspectionList = () => {
             console.error('Error fetching inspections:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteInspection = async (e, inspId) => {
+        e.stopPropagation();
+        if (!window.confirm('Are you sure you want to delete this inspection? This cannot be undone.')) return;
+        try {
+            const res = await api.delete(`/api/admin/workflow/inspections/${inspId}`);
+            if (res.data.success) {
+                fetchInspections();
+            }
+        } catch (error) {
+            alert('Failed to delete inspection: ' + (error.response?.data?.message || error.message));
         }
     };
 
@@ -224,6 +238,13 @@ const InspectionList = () => {
                                                     className="px-4 py-2 bg-gray-50 rounded-xl text-[10px] font-black text-gray-700 uppercase hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
                                                 >
                                                     {insp.status === 'Completed' ? 'Report' : 'Open'}
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleDeleteInspection(e, insp.id)}
+                                                    className="p-2 bg-gray-50 rounded-xl text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all shadow-sm"
+                                                    title="Delete inspection"
+                                                >
+                                                    <Trash2 size={14} />
                                                 </button>
                                             </div>
                                         </td>

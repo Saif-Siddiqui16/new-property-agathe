@@ -286,16 +286,33 @@ const NewInspectionWizard = () => {
                                 </InputGroup>
 
                                 <InputGroup label="Tenant" required>
-                                    <div className="w-full px-4 py-3 bg-gray-100 border border-gray-100 rounded-2xl text-sm font-bold text-gray-500 truncate">
-                                        {(() => {
-                                            const selectedUnit = units.find(u => u.unitId === parseInt(formData.unitId));
-                                            if (!selectedUnit) return 'Select a unit first';
-                                            return selectedUnit.tenantName ||
-                                                selectedUnit.lease?.tenant?.name ||
-                                                selectedUnit.unit?.reserved_by_user?.name ||
-                                                'No tenant/prospect linked';
-                                        })()}
-                                    </div>
+                                    {(() => {
+                                        const selectedUnit = units.find(u => u.unitId === parseInt(formData.unitId));
+                                        const tenantList = selectedUnit?.tenants || [];
+                                        if (tenantList.length <= 1) {
+                                            return (
+                                                <div className="w-full px-4 py-3 bg-gray-100 border border-gray-100 rounded-2xl text-sm font-bold text-gray-500 truncate">
+                                                    {selectedUnit
+                                                        ? (selectedUnit.tenantName || selectedUnit.lease?.tenant?.name || 'No tenant linked')
+                                                        : 'Select a unit first'}
+                                                </div>
+                                            );
+                                        }
+                                        return (
+                                            <select
+                                                value={formData.selectedTenantId || ''}
+                                                onChange={(e) => setFormData({ ...formData, selectedTenantId: e.target.value })}
+                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                                            >
+                                                <option value="">Select tenant name for this inspection</option>
+                                                {tenantList.map(t => (
+                                                    <option key={t.id} value={t.id.toString()}>
+                                                        {t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() || `Tenant #${t.id}`}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        );
+                                    })()}
                                 </InputGroup>
                             </div>
 

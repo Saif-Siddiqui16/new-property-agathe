@@ -319,7 +319,6 @@ const MoveOutDashboard = () => {
                             onClick={async (e) => {
                                 e.stopPropagation();
                                 if (item.status === 'PENDING') {
-                                    // Rule 2.2: Simple confirmation of move-out
                                     if (window.confirm("Confirm that this tenant is moving out?")) {
                                         try {
                                             const res = await api.put(`/api/admin/workflow/move-out/${item.id}/confirm`, {});
@@ -331,7 +330,6 @@ const MoveOutDashboard = () => {
                                     return;
                                 }
 
-                                // If any inspection is missing, priority is to START it
                                 if (item.status === 'CONFIRMED') {
                                     setScheduleType('VISUAL');
                                     setSelectedMoveOut(item);
@@ -339,7 +337,14 @@ const MoveOutDashboard = () => {
                                     return;
                                 }
 
-                                if (item.status.includes('SCHEDULED')) {
+                                // Check for any in-progress (DRAFT) inspection first — always prioritize continuing it
+                                const activeInspection = item.inspections?.find(i => i.status === 'DRAFT' || i.status === 'IN_PROGRESS');
+                                if (activeInspection) {
+                                    navigate(`/admin/workflow/inspections/${activeInspection.id}/form`);
+                                    return;
+                                }
+
+                                if (item.status.includes('SCHEDULED') || item.status === 'INSPECTION_IN_PROGRESS') {
                                     if (!item.finalDate) {
                                         setScheduleType('FINAL');
                                         setSelectedMoveOut(item);
@@ -347,15 +352,14 @@ const MoveOutDashboard = () => {
                                         return;
                                     }
 
-                                    // If scheduled but not started, prioritize STARTING it
-                                    if (!item.visualInspectionId || !item.finalInspectionId) {
-                                        const nextType = item.visualInspectionId ? 'MOVE_OUT' : 'VISUAL';
+                                    // Visual inspection: not started yet → create new
+                                    if (!item.visualInspectionId) {
                                         navigate('/admin/workflow/inspections/new', { 
                                             state: { 
                                                 moveOutId: item.id,
                                                 unitId: item.unitId,
                                                 leaseId: item.leaseId,
-                                                type: nextType,
+                                                type: 'VISUAL',
                                                 visualDate: item.visualDate,
                                                 visualTime: item.visualTime,
                                                 finalDate: item.finalDate,
@@ -364,13 +368,35 @@ const MoveOutDashboard = () => {
                                         });
                                         return;
                                     }
-                                }
 
-                                // If both are started, THEN allow continuing
-                                const activeInspection = item.inspections?.find(i => i.status === 'DRAFT' || i.status === 'IN_PROGRESS');
-                                if (activeInspection) {
-                                    navigate(`/admin/workflow/inspections/${activeInspection.id}/form`);
-                                    return;
+                                    // Visual done (completed), final not started yet → create new final
+                                    if (item.visualInspectionId && !item.finalInspectionId) {
+                                        const visualInsp = item.inspections?.find(i => i.id === item.visualInspectionId);
+                                        if (visualInsp?.status === 'COMPLETED') {
+                                            navigate('/admin/workflow/inspections/new', { 
+                                                state: { 
+                                                    moveOutId: item.id,
+                                                    unitId: item.unitId,
+                                                    leaseId: item.leaseId,
+                                                    type: 'MOVE_OUT',
+                                                    visualDate: item.visualDate,
+                                                    visualTime: item.visualTime,
+                                                    finalDate: item.finalDate,
+                                                    finalTime: item.finalTime
+                                                } 
+                                            });
+                                            return;
+                                        }
+                                        // Visual not completed yet — open it
+                                        navigate(`/admin/workflow/inspections/${item.visualInspectionId}/form`);
+                                        return;
+                                    }
+
+                                    // Both inspections exist and are COMPLETED — view the final one
+                                    if (item.visualInspectionId && item.finalInspectionId) {
+                                        navigate(`/admin/workflow/inspections/${item.finalInspectionId}`);
+                                        return;
+                                    }
                                 }
 
                                 if (item.status === 'INSPECTIONS_COMPLETED') {
@@ -391,11 +417,11 @@ const MoveOutDashboard = () => {
                                 <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">
                                     {item.status === 'PENDING' ? 'CONFIRM MOVE-OUT' : 
                                      item.status === 'CONFIRMED' ? 'SCHEDULE VISUAL' :
-                                     item.status.includes('SCHEDULED') && !item.finalDate ? 'SCHEDULE FINAL' :
-                                     item.status.includes('SCHEDULED') && !item.visualInspectionId ? 'START VISUAL' :
-                                     item.status.includes('SCHEDULED') && !item.finalInspectionId ? 'START FINAL' :
                                      item.inspections?.some(i => i.status === 'DRAFT' || i.status === 'IN_PROGRESS') ? 'CONTINUE INSPECTION' :
-                                     item.status === 'INSPECTION_IN_PROGRESS' ? 'CONTINUE' :
+                                     (item.status.includes('SCHEDULED') || item.status === 'INSPECTION_IN_PROGRESS') && !item.finalDate ? 'SCHEDULE FINAL' :
+                                     (item.status.includes('SCHEDULED') || item.status === 'INSPECTION_IN_PROGRESS') && !item.visualInspectionId ? 'START VISUAL' :
+                                     (item.status.includes('SCHEDULED') || item.status === 'INSPECTION_IN_PROGRESS') && !item.finalInspectionId ? 'START FINAL' :
+                                     (item.visualInspectionId && item.finalInspectionId) ? 'VIEW REPORT' :
                                      item.status === 'INSPECTIONS_COMPLETED' ? 'FINALIZE' : 'VIEW'}
                                 </span>
                             </div>
