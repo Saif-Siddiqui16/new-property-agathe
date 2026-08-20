@@ -133,6 +133,7 @@ const NewInspectionWizard = () => {
                 unitId: parseInt(formData.unitId),
                 leaseId: formData.leaseId ? parseInt(formData.leaseId) : null,
                 inspectorId: formData.inspectorId ? parseInt(formData.inspectorId) : null,
+                tenantId: formData.selectedTenantId ? parseInt(formData.selectedTenantId) : null,
                 date: formData.date,
                 time: formData.time
             });
