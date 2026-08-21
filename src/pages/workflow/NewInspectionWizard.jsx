@@ -126,6 +126,7 @@ const NewInspectionWizard = () => {
     };
 
     const handleCreateInspection = async () => {
+        if (loading) return;
         try {
             setLoading(true);
             const res = await api.post('/api/admin/workflow/inspections', {
@@ -139,8 +140,8 @@ const NewInspectionWizard = () => {
             });
 
             if (res.data.success) {
-                const targetDashboard = formData.type === 'MOVE_IN' ? 'move-in' : 'move-out';
-                navigate(`/admin/workflow/${targetDashboard}`);
+                const newInspection = res.data.data;
+                navigate(`/admin/workflow/inspections/${newInspection.id}/form`);
             }
         } catch (error) {
             alert('Failed to create inspection: ' + (error.response?.data?.message || error.message));
@@ -379,9 +380,10 @@ const NewInspectionWizard = () => {
                             </button>
                             <button
                                 onClick={handleNext}
-                                className="px-10 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2"
+                                disabled={loading}
+                                className="px-10 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {step === 3 ? 'Create & Start Inspection' : 'Next'}
+                                {step === 3 ? (loading ? 'Creating...' : 'Create & Start Inspection') : 'Next'}
                                 <ArrowRight size={18} />
                             </button>
                         </div>

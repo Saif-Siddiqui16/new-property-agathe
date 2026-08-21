@@ -29,6 +29,8 @@ const InspectionOverview = () => {
     const { id } = useParams();
     const [inspection, setInspection] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [isViewing, setIsViewing] = useState(false);
     const [activeTab, setActiveTab] = useState('Overview');
 
     useEffect(() => {
@@ -285,25 +287,39 @@ const InspectionOverview = () => {
                         ) : (
                             <QuickAction 
                                 icon={FileText} 
-                                label="View Full Report" 
+                                label={isViewing ? "Loading..." : "View Full Report"} 
                                 color="bg-indigo-600 text-white" 
+                                disabled={isViewing || isDownloading}
                                 onClick={async () => {
+                                    if (isViewing || isDownloading) return;
+                                    let newWindow = null;
                                     try {
-                                        const response = await api.get(`/api/admin/workflow/inspections/${id}/download`, { responseType: 'blob' });
+                                        setIsViewing(true);
+                                        newWindow = window.open('about:blank', '_blank');
+                                        newWindow.document.write('Loading PDF, please wait...');
+                                        const response = await api.get(`/api/admin/workflow/inspections/${id}/download`, { responseType: 'blob', timeout: 300000 });
                                         const file = new Blob([response.data], { type: 'application/pdf' });
                                         const fileURL = URL.createObjectURL(file);
-                                        window.open(fileURL, '_blank');
-                                    } catch (e) { console.error('Failed to view report', e); }
+                                        newWindow.location.href = fileURL;
+                                    } catch (e) { 
+                                        console.error('Failed to view report', e);
+                                        if (newWindow) newWindow.close();
+                                    } finally { 
+                                        setIsViewing(false); 
+                                    }
                                 }}
                             />
                         )}
                         <QuickAction 
                             icon={Download} 
-                            label="Download PDF" 
+                            label={isDownloading ? "Downloading..." : "Download PDF"} 
                             color="bg-gray-50 text-gray-600 border border-gray-100" 
+                            disabled={isDownloading || isViewing}
                             onClick={async () => {
+                                if (isDownloading) return;
                                 try {
-                                    const response = await api.get(`/api/admin/workflow/inspections/${id}/download`, { responseType: 'blob' });
+                                    setIsDownloading(true);
+                                    const response = await api.get(`/api/admin/workflow/inspections/${id}/download`, { responseType: 'blob', timeout: 300000 });
                                     const url = window.URL.createObjectURL(new Blob([response.data]));
                                     const link = document.createElement('a');
                                     link.href = url;
@@ -311,7 +327,7 @@ const InspectionOverview = () => {
                                     document.body.appendChild(link);
                                     link.click();
                                     link.remove();
-                                } catch (e) { console.error('Download failed', e); }
+                                } catch (e) { console.error('Download failed', e); } finally { setIsDownloading(false); }
                             }}
                         />
                         {inspection.status !== 'COMPLETED' && (
@@ -422,10 +438,11 @@ const TicketStat = ({ icon: Icon, label, value, color }) => (
     </div>
 );
 
-const QuickAction = ({ icon: Icon, label, color, onClick }) => (
+const QuickAction = ({ icon: Icon, label, color, onClick, disabled }) => (
     <button 
         onClick={onClick}
-        className={`w-full py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 shadow-sm hover:shadow-lg ${color}`}
+        disabled={disabled}
+        className={`w-full py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 shadow-sm hover:shadow-lg ${color} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
         <Icon size={18} />
         {label}

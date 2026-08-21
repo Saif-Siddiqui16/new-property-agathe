@@ -578,14 +578,26 @@ const InspectionForm = () => {
                                 </div>
                             </div>
                             
-                            {inspection.status === 'COMPLETED' && !isEditMode && (
-                                <button 
-                                    onClick={() => setIsEditMode(true)}
-                                    className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-white border border-gray-100 rounded-2xl text-xs font-black text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
-                                >
-                                    <Edit3 size={16} /> Enter Edit Mode
-                                </button>
-                            )}
+                            <div className="flex items-center gap-3">
+                                {inspection.status === 'DRAFT' && (
+                                    <button
+                                        onClick={handleSaveProgress}
+                                        disabled={saving}
+                                        className={`w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-xs font-black text-indigo-600 hover:bg-indigo-100 transition-all shadow-sm ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        <Save size={16} />
+                                        {saving ? 'Saving...' : 'Save & Exit'}
+                                    </button>
+                                )}
+                                {inspection.status === 'COMPLETED' && !isEditMode && (
+                                    <button 
+                                        onClick={() => setIsEditMode(true)}
+                                        className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-white border border-gray-100 rounded-2xl text-xs font-black text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
+                                    >
+                                        <Edit3 size={16} /> Enter Edit Mode
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* Horizontal Room Navigator for Tablets/Mobile - Always visible on small screens */}
