@@ -151,8 +151,8 @@ export const RevenueDashboard = () => {
 
               <Card className="rounded-[18px] bg-white shadow-[0_15px_35px_rgba(0,0,0,0.05)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_25px_50px_rgba(0,0,0,0.1)] border-l-[6px] border-purple-500">
                 <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Total Deposits</span>
-                <h2 className="text-[1.85rem] font-black mt-2 leading-tight text-slate-800" title={`$${(stats.actualDeposit || 0).toLocaleString('en-CA')}`}>
-                  ${(stats.actualDeposit || 0).toLocaleString('en-CA')}
+                <h2 className="text-[1.85rem] font-black mt-2 leading-tight text-slate-800" title={`$${(stats.actualDeposit || 0).toLocaleString('en-CA', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}>
+                  ${(stats.actualDeposit || 0).toLocaleString('en-CA', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </h2>
                 <p className="text-xs text-gray-400 mt-2 font-medium">Security deposits received</p>
               </Card>

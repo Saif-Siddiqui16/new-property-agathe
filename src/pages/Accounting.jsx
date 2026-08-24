@@ -105,7 +105,7 @@ export const Accounting = () => {
                 </Card>
                 <Card className="p-4 bg-white border-slate-200 shadow-sm border-l-4 border-purple-500">
                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Deposits</div>
-                    <div className="text-2xl font-black text-slate-800">${totalDeposits.toLocaleString('en-CA')}</div>
+                    <div className="text-2xl font-black text-slate-800">${(totalDeposits || 0).toLocaleString('en-CA', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                 </Card>
                 <Card className="p-4 bg-white border-slate-200 shadow-sm border-l-4 border-orange-500">
                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fees</div>
