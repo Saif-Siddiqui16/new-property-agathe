@@ -32,7 +32,22 @@ export const UnitDetail = () => {
     const fetchUnitDetails = async () => {
         try {
             const response = await api.get(`/api/admin/units/${id}`);
-            setUnit(response.data);
+            const unitData = response.data;
+
+            try {
+                const tempRes = await api.get('/api/admin/temporary-assignments');
+                const assignments = tempRes.data?.data || tempRes.data || [];
+                const tempAssignment = assignments.find(a => a.tempUnitId === parseInt(id) && a.status === 'Active');
+                if (tempAssignment) {
+                    unitData.isTemporarilyOccupied = true;
+                    const name = tempAssignment.tenant?.name || tempAssignment.tenant || tempAssignment.firstName + ' ' + tempAssignment.lastName;
+                    unitData.tempTenantName = name;
+                }
+            } catch (e) {
+                console.error('Failed to fetch temporary assignments', e);
+            }
+
+            setUnit(unitData);
 
             // Fetch linked documents ONLY if user has permissions
             const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -140,8 +155,8 @@ export const UnitDetail = () => {
                             </Card>
                             <Card className="p-3 flex flex-col gap-1">
                                 <div className="text-[10px] text-slate-500 uppercase font-bold">Status</div>
-                                <div className={`text-base font-bold ${unit.status === 'Occupied' ? 'text-green-600' : 'text-red-600'}`}>
-                                    {unit.status || 'Vacant'}
+                                <div className={`text-base font-bold ${unit.isTemporarilyOccupied ? 'text-purple-600' : unit.status === 'Occupied' ? 'text-green-600' : 'text-red-600'}`}>
+                                    {unit.isTemporarilyOccupied ? `Temporarily Occupied – ${unit.tempTenantName}` : (unit.status || 'Vacant')}
                                 </div>
                             </Card>
                         </section>

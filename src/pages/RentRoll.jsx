@@ -450,6 +450,28 @@ export const RentRoll = () => {
                                                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-indigo-600 text-white border border-indigo-700 shadow-sm transition-all">
                                                             {row.status}
                                                         </span>
+                                                    ) : row.status === 'Temporarily elsewhere' ? (
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <span className="px-2.5 py-1 rounded-full text-[9px] font-black border bg-indigo-50 text-indigo-700 border-indigo-200 uppercase tracking-widest leading-none whitespace-nowrap">
+                                                                {row.status}
+                                                            </span>
+                                                            {row.relatedUnit && row.relatedUnit !== '-' && (
+                                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight mt-0.5">
+                                                                    {row.relatedUnit}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : row.status === 'Temporarily Occupied' ? (
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <span className="px-2.5 py-1 rounded-full text-[9px] font-black border bg-purple-100 text-purple-800 border-purple-300 uppercase tracking-widest leading-none shadow-sm whitespace-nowrap">
+                                                                {row.status}
+                                                            </span>
+                                                            {row.relatedUnit && row.relatedUnit !== '-' && (
+                                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight mt-0.5">
+                                                                    {row.relatedUnit}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     ) : row.status === 'Reserved' ? (
                                                         <>
                                                             <div className="flex flex-col items-center gap-1">

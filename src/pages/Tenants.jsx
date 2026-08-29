@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { Button } from '../components/Button';
-import { Plus, Search, User, Eye, Trash2, FileText, Shield, Download, Upload, ArrowLeft, Calendar, FileCheck, AlertCircle, Pencil, Mail, Smartphone, Send, CheckCircle, Building2 } from 'lucide-react';
+import { Plus, Search, User, Eye, Trash2, FileText, Shield, Download, Upload, ArrowLeft, Calendar, FileCheck, AlertCircle, Pencil, Mail, Smartphone, Send, CheckCircle, Building2, Home, X } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../api/client';
 import { AccessControl } from '../components/AccessControl';
@@ -1200,6 +1200,8 @@ export const Tenants = () => {
 
 /* =========================
    TENANT DETAIL COMPONENT
+/* =========================
+   TENANT DETAIL COMPONENT
   ========================= */
 
 const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) => {
@@ -1215,6 +1217,67 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
   const [policies, setPolicies] = useState(tenant.insurance || []);
   const [leases, setLeases] = useState([]);
   const [tickets, setTickets] = useState([]);
+  const [showTempUnitModal, setShowTempUnitModal] = useState(false);
+  const [tempUnitLease, setTempUnitLease] = useState(null);
+  const [tempBuildingId, setTempBuildingId] = useState('');
+  const [tempUnitList, setTempUnitList] = useState([]);
+  const [tempBuildingList, setTempBuildingList] = useState([]);
+  const [selectedTempUnitId, setSelectedTempUnitId] = useState('');
+  
+  const handleAssignTempUnit = async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    try {
+      const payload = {
+        tempBuildingId: parseInt(form.tempBuildingId.value),
+        tempUnitId: parseInt(form.tempUnitId.value),
+        tempStartDate: form.startDate.value,
+        tempExpectedEndDate: form.endDate.value,
+        tempReason: form.reason.value
+      };
+      await api.post(`/api/admin/leases/${tempUnitLease.id}/assign-temporary-unit`, payload);
+      alert('Temporary unit assigned successfully');
+      setShowTempUnitModal(false);
+      setTempUnitLease(null);
+      fetchTenantData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to assign temporary unit');
+    }
+  };
+
+  const handleEndTempAssignment = async (leaseId) => {
+    if(!window.confirm('Are you sure you want to end this temporary assignment?')) return;
+    try {
+      await api.post(`/api/admin/leases/${leaseId}/end-temporary-assignment`);
+      alert('Temporary assignment ended successfully');
+      fetchTenantData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to end temporary assignment');
+    }
+  };
+
+  useEffect(() => {
+    if(showTempUnitModal) {
+      api.get('/api/admin/properties').then(res => setTempBuildingList(res.data?.data || res.data || []));
+    }
+  }, [showTempUnitModal]);
+
+  // Fetch temp units when building changes
+  useEffect(() => {
+    const fetchTempUnits = async () => {
+      if (tempBuildingId) {
+        try {
+          const res = await api.get(`/api/admin/units?building_id=${tempBuildingId}&limit=100`);
+          setTempUnitList(res.data?.data || res.data || []);
+        } catch(e) {}
+      } else {
+        setTempUnitList([]);
+      }
+    };
+    fetchTempUnits();
+  }, [tempBuildingId]);
 
   const fetchTenantData = async () => {
     try {
@@ -1743,9 +1806,37 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                               }`}>
                               {lease.status}
                             </span>
+                            {lease.tempUnitId && (
+                              <div className="mt-1">
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-tight block w-max">
+                                  Temp Unit: {lease.tempUnit?.name || lease.tempUnitId}
+                                </span>
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex justify-end gap-2">
+                              {lease.status === 'Active' && !lease.tempUnitId && (
+                                <button
+                                  onClick={() => {
+                                    setTempUnitLease(lease);
+                                    setShowTempUnitModal(true);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                  title="Assign Temporary Unit"
+                                >
+                                  <Home size={18} />
+                                </button>
+                              )}
+                              {lease.tempUnitId && (
+                                <button
+                                  onClick={() => handleEndTempAssignment(lease.id)}
+                                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                  title="End Temporary Assignment"
+                                >
+                                  <AlertCircle size={18} />
+                                </button>
+                              )}
                               <button
                                 onClick={async () => {
                                   try {
@@ -2407,8 +2498,6 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
           )
         }
 
-        {/* EDIT TENANT MODAL */}
-
         {/* CONTACT TENANT MODAL */}
         {
           showContactTenant && (
@@ -2524,7 +2613,100 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
           )
         }
 
+        {/* Temporary Unit Assignment Modal */}
+        {showTempUnitModal && tempUnitLease && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+              <div className="flex justify-between items-center p-6 border-b border-slate-100">
+                <div>
+                  <h3 className="font-bold text-slate-800 text-lg">Assign Temporary Unit</h3>
+                  <p className="text-xs text-slate-500 mt-1">Move tenant to a temporary location</p>
+                </div>
+                <button
+                  onClick={() => setShowTempUnitModal(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <form onSubmit={handleAssignTempUnit} className="p-6 space-y-4">
+                
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Temporary Building</label>
+                  <select 
+                    name="tempBuildingId" 
+                    required 
+                    value={tempBuildingId}
+                    onChange={(e) => setTempBuildingId(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                  >
+                    <option value="">Select Building...</option>
+                    {tempBuildingList.map(b => (
+                      <option key={b.id} value={b.id}>{b.name || 'Building ' + b.id}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Temporary Unit</label>
+                  <select 
+                    name="tempUnitId" 
+                    required 
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                  >
+                    <option value="">Select Unit...</option>
+                    {tempUnitList.map(u => (
+                      <option key={u.id} value={u.id}>{u.name || u.unitNumber}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Start Date</label>
+                    <input 
+                      type="date" 
+                      name="startDate" 
+                      required 
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Expected End Date</label>
+                    <input 
+                      type="date" 
+                      name="endDate" 
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700" 
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Reason</label>
+                  <select 
+                    name="reason" 
+                    required 
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700"
+                  >
+                    <option value="Repairs/Maintenance">Repairs/Maintenance</option>
+                    <option value="Contracted unit not ready">Contracted unit not ready</option>
+                    <option value="Water Damage">Water Damage</option>
+                    <option value="Remediation">Remediation</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 mt-6">
+                  <Button type="button" variant="secondary" onClick={() => setShowTempUnitModal(false)}>Cancel</Button>
+                  <Button type="submit" variant="primary">Assign Temporary Unit</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
       </div >
-    </MainLayout >
+
+    </MainLayout>
   );
 };
