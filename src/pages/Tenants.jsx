@@ -1229,11 +1229,12 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
     const form = e.target;
     try {
       const payload = {
-        tempBuildingId: parseInt(form.tempBuildingId.value),
-        tempUnitId: parseInt(form.tempUnitId.value),
-        tempStartDate: form.startDate.value,
-        tempExpectedEndDate: form.endDate.value,
-        tempReason: form.reason.value
+        temp_building_id: parseInt(form.tempBuildingId.value),
+        temp_unit_id: parseInt(form.tempUnitId.value),
+        start_date: form.startDate.value,
+        expected_end_date: form.endDate.value,
+        reason: form.reason.value,
+        variance: form.variance ? parseFloat(form.variance.value) : null
       };
       await api.post(`/api/admin/leases/${tempUnitLease.id}/assign-temporary-unit`, payload);
       alert('Temporary unit assigned successfully');
@@ -1246,12 +1247,21 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
     }
   };
 
-  const handleEndTempAssignment = async (leaseId) => {
-    if(!window.confirm('Are you sure you want to end this temporary assignment?')) return;
+  const handleEndTempAssignment = async (lease) => {
+    if(!window.confirm('Are you sure you want to end this temporary assignment? The physical temporary unit will enter "Preparation" status for turnover.')) return;
     try {
-      await api.post(`/api/admin/leases/${leaseId}/end-temporary-assignment`);
-      alert('Temporary assignment ended successfully');
-      fetchTenantData();
+      await api.post(`/api/admin/leases/${lease.id}/end-temporary-assignment`);
+      
+      if(window.confirm('Temporary assignment ended successfully. Would you like to schedule a Move-Out Inspection for the temporary unit now?')) {
+          navigate('/admin/workflow/inspections/new', {
+              state: {
+                  type: 'MOVE_OUT',
+                  unitId: lease.tempUnitId
+              }
+          });
+      } else {
+          fetchTenantData();
+      }
     } catch (err) {
       console.error(err);
       alert('Failed to end temporary assignment');
@@ -1768,7 +1778,7 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                           <td className="px-6 py-4 text-sm text-slate-700">{lease.unit?.rentalMode || 'Full Unit'}</td>
                           <td className="px-6 py-4 text-sm text-slate-600">{lease.unit?.name || 'N/A'}</td>
                           <td className="px-6 py-4 text-sm text-slate-600">
-                            {lease.startDate ? new Date(lease.startDate).toLocaleDateString() : 'TBD'} - {lease.endDate ? new Date(lease.endDate).toLocaleDateString() : 'TBD'}
+                            {lease.startDate ? new Date(lease.startDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : 'TBD'} - {lease.endDate ? new Date(lease.endDate).toLocaleDateString(undefined, { timeZone: 'UTC' }) : 'TBD'}
                           </td>
                           <td className="px-6 py-4 text-sm text-slate-700 font-bold">
                             {(!lease.monthlyRent || parseFloat(lease.monthlyRent) === 0) ? (
@@ -1830,7 +1840,7 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                               )}
                               {lease.tempUnitId && (
                                 <button
-                                  onClick={() => handleEndTempAssignment(lease.id)}
+                                  onClick={() => handleEndTempAssignment(lease)}
                                   className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                                   title="End Temporary Assignment"
                                 >
@@ -2694,6 +2704,21 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                     <option value="Remediation">Remediation</option>
                     <option value="Other">Other</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                    Temporary Accommodation Variance ($)
+                    <span className="text-xs text-slate-400 font-normal ml-2">(Optional)</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    name="variance" 
+                    placeholder="0.00"
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700" 
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">For management reporting only. Does not affect rent or accounting.</p>
                 </div>
 
                 <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 mt-6">

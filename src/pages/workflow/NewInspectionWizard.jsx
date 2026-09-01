@@ -28,7 +28,8 @@ const NewInspectionWizard = () => {
         propertyId: '',
         inspectorId: '1',
         date: new Date().toISOString().split('T')[0],
-        time: ''
+        time: '',
+        isTempUnit: false
     });
     const [loading, setLoading] = useState(false);
     const [units, setUnits] = useState([]);
@@ -270,6 +271,21 @@ const NewInspectionWizard = () => {
                                         }
                                     </select>
                                 </InputGroup>
+
+                                <div className="md:col-span-2">
+                                    <label className="flex items-center gap-3 cursor-pointer p-4 rounded-2xl border border-gray-200 hover:bg-indigo-50/50 transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.isTempUnit}
+                                            onChange={(e) => setFormData({ ...formData, isTempUnit: e.target.checked })}
+                                            className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <div>
+                                            <span className="block text-sm font-bold text-gray-900">Inspect Temporary Unit</span>
+                                            <span className="block text-xs text-gray-500">Check this if the tenant is moving into a temporary unit instead of their contracted unit.</span>
+                                        </div>
+                                    </label>
+                                </div>
 
                                 <InputGroup label="Inspector" required>
                                     <select

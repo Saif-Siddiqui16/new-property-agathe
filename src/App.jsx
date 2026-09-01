@@ -24,6 +24,7 @@ import UnitReadiness from "./pages/UnitReadiness";
 
 /* TENANTS */
 import { Tenants } from "./pages/Tenants";
+import { TemporaryAssignments } from "./pages/TemporaryAssignments";
 import { InsuranceAlerts } from "./pages/InsuranceAlerts";
 import { DocumentLibrary } from "./pages/DocumentLibrary";
 import { Vehicles } from "./pages/Vehicles";
@@ -136,6 +137,7 @@ function App() {
           {/* TENANTS */}
           <Route path="/tenants" element={<Tenants />} />
           <Route path="/tenants/:id" element={<Tenants />} />
+          <Route path="/tenants/temporary-assignments" element={<TemporaryAssignments />} />
           <Route path="/tenants/vehicles" element={<Vehicles />} />
           <Route path="/owners" element={<Owners />} />
           <Route path="/insurance-alerts" element={<InsuranceAlerts />} />

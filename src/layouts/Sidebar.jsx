@@ -62,6 +62,7 @@ const NAV_ITEMS = [
     children: [
       { label: "Tenant List", tKey: "sidebar.tenant_list", path: "/tenants" },
       { label: "Vehicle Management", tKey: "sidebar.vehicles", path: "/tenants/vehicles" },
+      { label: "Temporary Assignments", path: "/tenants/temporary-assignments" },
       // { label: "Owners", path: "/owners" },
       { label: "Insurance Alerts", tKey: "sidebar.insurance", path: "/insurance-alerts" }
     ]

@@ -62,18 +62,19 @@ export const Units = () => {
 
   const [typeFilter, setTypeFilter] = useState('');
   const [buildingFilter, setBuildingFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   useEffect(() => {
     // Reset page to 1 when filters change
     setPagination(prev => ({ ...prev, page: 1 }));
-  }, [typeFilter, buildingFilter, search]);
+  }, [typeFilter, buildingFilter, search, statusFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchData(pagination.page);
     }, 400); // Debounce search/filter
     return () => clearTimeout(timer);
-  }, [pagination.page, typeFilter, buildingFilter, search, showInactive]);
+  }, [pagination.page, typeFilter, buildingFilter, search, showInactive, statusFilter]);
 
   useEffect(() => {
     if (showModal || viewUnit || editUnit || deleteConfirm) {
@@ -114,6 +115,7 @@ export const Units = () => {
         search: search || '',
         unitType: typeFilter || '',
         propertyId: buildingFilter || '',
+        status: statusFilter || '',
         showInactive: showInactive ? 'true' : 'false'
       });
 
@@ -403,8 +405,8 @@ export const Units = () => {
         )}
 
         {/* TOP CONTROLS */}
-        <section className="flex justify-between items-center">
-          <div className="flex gap-4">
+        <section className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             <div className="flex items-center gap-2 bg-white py-2.5 px-3.5 rounded-xl shadow-sm border border-slate-200">
               <Filter size={16} className="text-slate-400" />
               <select
@@ -430,6 +432,21 @@ export const Units = () => {
                 {buildings.map(b => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 bg-white py-2.5 px-3.5 rounded-xl shadow-sm border border-slate-200">
+              <Filter size={16} className="text-slate-400" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="border-none outline-none text-sm bg-transparent text-slate-700 min-w-[120px] font-medium cursor-pointer"
+              >
+                <option value="">All Statuses</option>
+                <option value="Vacant">Vacant</option>
+                <option value="Occupied">Occupied</option>
+                <option value="Fully Booked">Fully Booked</option>
+                <option value="Temporarily Occupied">Temporarily Occupied</option>
               </select>
             </div>
 
@@ -515,13 +532,16 @@ export const Units = () => {
                       <span className="text-slate-600">{unit.bedrooms || '-'}</span>
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold w-fit ${
                         unit.unit_status === 'INACTIVE' ? (unit.reserved_flag ? 'bg-blue-100 text-blue-700 border border-blue-200 uppercase tracking-tighter' : 'bg-amber-100 text-amber-700 border border-amber-200 uppercase tracking-tighter') :
+                        unit.physical_occupancy_status === 'Temporarily Occupied' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
                         unit.status === 'Occupied' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
                         unit.status === 'Fully Booked' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' :
                         'bg-emerald-50 text-emerald-700 border border-emerald-100'
                       }`}>
                         {unit.unit_status === 'INACTIVE' 
                           ? (unit.reserved_flag ? 'Reserved - Not Ready' : 'In Construction') 
-                          : (unit.reserved_flag ? 'Reserved - Ready for Move-In' : unit.status)
+                          : unit.physical_occupancy_status === 'Temporarily Occupied'
+                            ? 'Temporarily Occupied'
+                            : (unit.reserved_flag ? 'Reserved - Ready for Move-In' : unit.status)
                         }
                       </span>
                       <div className="flex items-center gap-2">
