@@ -51,6 +51,7 @@ const NAV_ITEMS = [
     children: [
       { label: "Buildings", tKey: "sidebar.buildings", path: "/properties/buildings" },
       { label: "Units", tKey: "sidebar.units", path: "/units" },
+      { label: "Locker Inventory", path: "/lockers" },
       { label: "Unit Readiness", path: "/unit-readiness" }
     ]
   },

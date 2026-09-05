@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { AIAssistant } from '../components/AIAssistant';
 import api from '../api/client';
 
 // Timestamp-based approach — immune to React StrictMode double-invocation.
@@ -112,6 +113,9 @@ export const MainLayout = ({ children, title = 'Overview' }) => {
                         </div>
                     ) : children}
                 </main>
+                
+                {/* Global AI Assistant */}
+                <AIAssistant />
             </div>
         </div>
     );

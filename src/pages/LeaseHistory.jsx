@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Trash2, X, FileText, Calendar, User, Home, Bed, AlertTriangle, CheckCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Eye, Pencil, Trash2, X, FileText, Calendar, User, Home, Bed, AlertTriangle, CheckCircle, Search, ChevronLeft, ChevronRight, Plus, Lock } from 'lucide-react';
 import { Button } from '../components/Button';
 import api from '../api/client';
 import { hasPermission } from '../utils/permissions';
@@ -27,6 +27,12 @@ export const LeaseHistory = () => {
     const [page, setPage] = useState(1);
     const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
     const [isLoading, setIsLoading] = useState(false);
+
+    // Locker state
+    const [leaseLockers, setLeaseLockers] = useState([]);
+    const [availableLockers, setAvailableLockers] = useState([]);
+    const [newLockerRows, setNewLockerRows] = useState([]);
+    const [lockerToEdit, setLockerToEdit] = useState(null);
 
     /* LOAD DATA */
     const fetchLeases = async () => {
@@ -79,6 +85,17 @@ export const LeaseHistory = () => {
             }
         };
         fetchBuildings();
+
+        // Fetch all available lockers for the dropdown
+        const fetchLockers = async () => {
+            try {
+                const res = await api.get('/api/admin/lockers');
+                setAvailableLockers(res.data || []);
+            } catch (err) {
+                console.error('Failed to fetch lockers', err);
+            }
+        };
+        fetchLockers();
     }, []);
 
     /* SEND CREDENTIALS */
@@ -119,15 +136,41 @@ export const LeaseHistory = () => {
                 startDate: editLease.startDate,
                 endDate: editLease.endDate,
                 firstName: editLease.tenantFirstName,
-                lastName: editLease.tenantLastName
+                lastName: editLease.tenantLastName,
+                lockers: [
+                    // Existing locker edits (end date changes)
+                    ...leaseLockers
+                        .filter(lr => lockerToEdit && lockerToEdit.id === lr.id)
+                        .map(lr => ({ rentalId: lr.id, endDate: lr.endDate, rentAmount: lr.rentAmount })),
+                    // New lockers added
+                    ...newLockerRows
+                        .filter(row => row.lockerId && row.startDate && row.endDate && row.rentAmount)
+                        .map(row => ({ lockerId: row.lockerId, startDate: row.startDate, endDate: row.endDate, rentAmount: row.rentAmount }))
+                ]
             };
 
             await api.put(`/api/admin/leases/${editLease.id}`, payload);
             fetchLeases();
             setEditLease(null);
+            setNewLockerRows([]);
+            setLockerToEdit(null);
+            setLeaseLockers([]);
         } catch (error) {
             console.error(error);
             alert('Failed to update lease');
+        }
+    };
+
+    const openEditWithLockers = async (lease) => {
+        setEditLease({ ...lease });
+        setNewLockerRows([]);
+        setLockerToEdit(null);
+        // Fetch existing locker rentals for this lease
+        try {
+            const res = await api.get(`/api/admin/leases/${lease.id}/lockers`);
+            setLeaseLockers(res.data || []);
+        } catch {
+            setLeaseLockers([]);
         }
     };
 
@@ -284,7 +327,7 @@ export const LeaseHistory = () => {
                                                 {hasPermission('Leases', 'edit') && (
                                                     <button
                                                         className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all duration-200"
-                                                        onClick={() => setEditLease({ ...lease })}
+                                                        onClick={() => openEditWithLockers(lease)}
                                                         title="Edit Lease"
                                                     >
                                                         <Pencil size={16} />
@@ -404,6 +447,39 @@ export const LeaseHistory = () => {
                                         {selectedLease.status.charAt(0).toUpperCase() + selectedLease.status.slice(1).toLowerCase()}
                                     </span>
                                 </div>
+                                {selectedLease.lockers && selectedLease.lockers.length > 0 && (
+                                    <div className="mt-4">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Lock size={15} className="text-indigo-500" />
+                                            <span className="text-sm font-bold text-slate-700">Locker Rentals</span>
+                                        </div>
+                                        {selectedLease.lockers.map((lr, i) => {
+                                            const today = new Date().toISOString().split('T')[0];
+                                            const sDate = lr.startDate?.substring(0, 10);
+                                            const eDate = lr.endDate?.substring(0, 10);
+                                            let status = 'Upcoming';
+                                            if (sDate <= today && eDate >= today) status = 'Active';
+                                            else if (eDate < today) status = 'Ended';
+
+                                            return (
+                                                <div key={i} className="bg-indigo-50 rounded-lg p-3 mb-2 text-xs text-slate-700 border border-indigo-100 flex justify-between items-center">
+                                                    <div>
+                                                        <div className="font-bold text-indigo-700">{lr.locker?.property?.name} — {lr.locker?.lockerNumber}</div>
+                                                        <div className="text-slate-500 mt-1">${Number(lr.rentAmount).toFixed(2)}/mo · {sDate} → {eDate}</div>
+                                                    </div>
+                                                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                                                        status === 'Active' ? 'bg-emerald-100 text-emerald-700' :
+                                                        status === 'Upcoming' ? 'bg-amber-100 text-amber-700' :
+                                                        'bg-slate-200 text-slate-600'
+                                                    }`}>
+                                                        {status}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
                             </div>
 
                             <div className="flex justify-end">
@@ -497,6 +573,101 @@ export const LeaseHistory = () => {
                                             required
                                         />
                                     </div>
+                                </div>
+
+                                {/* LOCKER SECTION (Req 11) */}
+                                <div className="border-t border-slate-100 pt-4 mt-2">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Lock size={15} className="text-indigo-500" />
+                                            <span className="text-sm font-bold text-slate-700">Lockers</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1"
+                                            onClick={() => setNewLockerRows([...newLockerRows, { lockerId: '', rentAmount: '', startDate: '', endDate: '' }])}
+                                        >
+                                            <Plus size={13} /> Add Another Locker
+                                        </button>
+                                    </div>
+
+                                    {/* Existing Lockers */}
+                                    {leaseLockers.map((lr, i) => (
+                                        <div key={lr.id} className="bg-indigo-50 rounded-lg p-3 mb-2 border border-indigo-100">
+                                            <div className="text-xs font-bold text-indigo-700 mb-2">{lr.locker?.property?.name} — {lr.locker?.lockerNumber}</div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div>
+                                                    <label className="text-[10px] text-slate-500 font-medium uppercase">Rent</label>
+                                                    <input
+                                                        type="number"
+                                                        className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 outline-none focus:border-indigo-400"
+                                                        value={lr.rentAmount}
+                                                        onChange={(e) => {
+                                                            const updated = [...leaseLockers];
+                                                            updated[i] = { ...lr, rentAmount: e.target.value };
+                                                            setLeaseLockers(updated);
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-slate-500 font-medium uppercase">End Date</label>
+                                                    <input
+                                                        type="date"
+                                                        className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 outline-none focus:border-indigo-400"
+                                                        value={lr.endDate?.substring(0, 10)}
+                                                        onChange={(e) => {
+                                                            const updated = [...leaseLockers];
+                                                            updated[i] = { ...lr, endDate: e.target.value };
+                                                            setLeaseLockers(updated);
+                                                            setLockerToEdit(lr);
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* New Locker Rows */}
+                                    {newLockerRows.map((row, i) => (
+                                        <div key={i} className="bg-slate-50 rounded-lg p-3 mb-2 border border-slate-200">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-xs font-bold text-slate-600">New Locker {i + 1}</span>
+                                                <button type="button" className="text-red-400 hover:text-red-600" onClick={() => setNewLockerRows(newLockerRows.filter((_, idx) => idx !== i))}>
+                                                    <X size={13} />
+                                                </button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <select
+                                                    className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 outline-none focus:border-indigo-400"
+                                                    value={row.lockerId}
+                                                    onChange={(e) => { const r = [...newLockerRows]; r[i] = { ...row, lockerId: e.target.value }; setNewLockerRows(r); }}
+                                                >
+                                                    <option value="">Select Locker</option>
+                                                    {availableLockers.map(l => (
+                                                        <option key={l.id} value={l.id}>{l.property?.name} — {l.lockerNumber}</option>
+                                                    ))}
+                                                </select>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 font-medium uppercase">Rent/mo</label>
+                                                        <input type="number" placeholder="40" className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 outline-none focus:border-indigo-400" value={row.rentAmount} onChange={(e) => { const r = [...newLockerRows]; r[i] = { ...row, rentAmount: e.target.value }; setNewLockerRows(r); }} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 font-medium uppercase">Start</label>
+                                                        <input type="date" className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 outline-none focus:border-indigo-400" value={row.startDate} onChange={(e) => { const r = [...newLockerRows]; r[i] = { ...row, startDate: e.target.value }; setNewLockerRows(r); }} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 font-medium uppercase">End</label>
+                                                        <input type="date" className="w-full px-2 py-1.5 text-xs rounded border border-slate-200 outline-none focus:border-indigo-400" value={row.endDate} onChange={(e) => { const r = [...newLockerRows]; r[i] = { ...row, endDate: e.target.value }; setNewLockerRows(r); }} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {leaseLockers.length === 0 && newLockerRows.length === 0 && (
+                                        <p className="text-xs text-slate-400 italic">No lockers assigned. Click "Add Another Locker" to assign one.</p>
+                                    )}
                                 </div>
                             </div>
 

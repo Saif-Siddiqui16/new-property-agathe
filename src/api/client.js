@@ -27,11 +27,15 @@ api.interceptors.request.use(
             //backendUrl = 'http://localhost:5001';
         }
 
-        // FORCE CENTRALIZED PERMISSIONS: 
-        // Always fetch permissions from Masteko backend, regardless of which property is selected
-        if (config.url && (config.url.includes('/my-permissions') || config.url.includes('/permissions'))) {
+        // FORCE CENTRALIZED PERMISSIONS AND AI: 
+        // Always fetch permissions and AI queries from Masteko backend, regardless of which property is selected
+        if (config.url && (
+            config.url.includes('/my-permissions') || 
+            config.url.includes('/permissions') ||
+            config.url.includes('/api/ai')
+        )) {
             backendUrl = 'https://saif-property-client-railway-production.up.railway.app';
-            //WbackendUrl = 'http://localhost:5000';
+            //backendUrl = 'http://localhost:5000';
         }
 
         config.baseURL = backendUrl;

@@ -3,7 +3,7 @@ import { MainLayout } from '../layouts/MainLayout';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { Button } from '../components/Button';
-import { Home, User, Calendar, DollarSign, Shield, ChevronDown, Bed } from 'lucide-react';
+import { Home, User, Calendar, DollarSign, Shield, ChevronDown, Bed, Lock, Plus, X } from 'lucide-react';
 
 export const LeaseForm = () => {
   const navigate = useNavigate();
@@ -22,13 +22,26 @@ export const LeaseForm = () => {
     endDate: '',
     monthlyRent: '',
     securityDeposit: '',
-    sendCredentials: false
+    sendCredentials: false,
+    lockers: []
   });
+  
+  const [availableLockers, setAvailableLockers] = useState([]);
 
   useEffect(() => {
     fetchBuildings();
     fetchTenants();
+    fetchLockers();
   }, []);
+
+  const fetchLockers = async () => {
+    try {
+      const res = await api.get('/api/admin/lockers');
+      setAvailableLockers(res.data || []);
+    } catch (error) {
+      console.error('Failed to fetch lockers', error);
+    }
+  };
 
   const fetchBuildings = async () => {
     try {
@@ -121,7 +134,13 @@ export const LeaseForm = () => {
         endDate: form.endDate,
         monthlyRent: parseFloat(form.monthlyRent) || 0,
         securityDeposit: parseFloat(form.securityDeposit) || 0,
-        sendCredentials: form.sendCredentials === true
+        sendCredentials: form.sendCredentials === true,
+        lockers: form.lockers.filter(l => l.lockerId && l.startDate && l.endDate && l.rentAmount).map(l => ({
+          lockerId: parseInt(l.lockerId),
+          rentAmount: parseFloat(l.rentAmount),
+          startDate: l.startDate,
+          endDate: l.endDate
+        }))
       };
 
       const res = await api.post('/api/admin/leases', payload);
@@ -359,7 +378,68 @@ export const LeaseForm = () => {
           </div>
         </div>
 
+        {/* Lockers Section */}
+        <div className="mt-8 border-t border-slate-100 pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Lock size={18} className="text-indigo-500" />
+              <h3 className="text-lg font-bold text-slate-800 m-0">Add Locker? (Optional)</h3>
+            </div>
+            <button
+              type="button"
+              className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1"
+              onClick={() => setForm(prev => ({ ...prev, lockers: [...prev.lockers, { lockerId: '', rentAmount: '', startDate: '', endDate: '' }] }))}
+            >
+              <Plus size={16} /> Add Locker
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {form.lockers.map((row, i) => (
+              <div key={i} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-sm font-bold text-slate-700">Locker {i + 1}</span>
+                  <button type="button" className="text-red-400 hover:text-red-600" onClick={() => setForm(prev => ({ ...prev, lockers: prev.lockers.filter((_, idx) => idx !== i) }))}>
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Select Locker</label>
+                    <select
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm"
+                      value={row.lockerId}
+                      onChange={(e) => { const r = [...form.lockers]; r[i] = { ...row, lockerId: e.target.value }; setForm({ ...form, lockers: r }); }}
+                    >
+                      <option value="">Choose Locker</option>
+                      {availableLockers.map(l => (
+                        <option key={l.id} value={l.id}>{l.property?.name} — {l.lockerNumber}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Rent/mo ($)</label>
+                    <input type="number" placeholder="0.00" className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:border-indigo-500 transition-all text-sm" value={row.rentAmount} onChange={(e) => { const r = [...form.lockers]; r[i] = { ...row, rentAmount: e.target.value }; setForm({ ...form, lockers: r }); }} />
+                  </div>
+                  <div className="md:col-span-2 md:col-start-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Start Date</label>
+                    <input type="date" className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:border-indigo-500 transition-all text-sm" value={row.startDate} onChange={(e) => { const r = [...form.lockers]; r[i] = { ...row, startDate: e.target.value }; setForm({ ...form, lockers: r }); }} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">End Date</label>
+                    <input type="date" className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:border-indigo-500 transition-all text-sm" value={row.endDate} onChange={(e) => { const r = [...form.lockers]; r[i] = { ...row, endDate: e.target.value }; setForm({ ...form, lockers: r }); }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {form.lockers.length === 0 && (
+              <p className="text-sm text-slate-500 italic">No lockers assigned. Click "Add Locker" to assign one to this lease.</p>
+            )}
+          </div>
+        </div>
+
         {/* Send Credentials Toggle */}
+
         <div className="flex items-center mt-8 mb-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
           <input
             type="checkbox"
