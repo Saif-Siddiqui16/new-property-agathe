@@ -30,7 +30,7 @@ api.interceptors.request.use(
         // FORCE CENTRALIZED PERMISSIONS AND AI: 
         // Always fetch permissions and AI queries from Masteko backend, regardless of which property is selected
         if (config.url && (
-            config.url.includes('/my-permissions') || 
+            config.url.includes('/my-permissions') ||
             config.url.includes('/permissions') ||
             config.url.includes('/api/ai')
         )) {

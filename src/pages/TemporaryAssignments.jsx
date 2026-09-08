@@ -54,13 +54,13 @@ export const TemporaryAssignments = () => {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Active':
-        return <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-xs font-bold uppercase tracking-wider">Active</span>;
+        return <span className="shrink-0 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-xs font-bold uppercase tracking-wider">Active</span>;
       case 'Ending Soon':
-        return <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-100 rounded-full text-xs font-bold uppercase tracking-wider">Ending Soon</span>;
+        return <span className="shrink-0 px-3 py-1 bg-amber-50 text-amber-700 border border-amber-100 rounded-full text-xs font-bold uppercase tracking-wider">Ending Soon</span>;
       case 'Overdue':
-        return <span className="px-3 py-1 bg-red-50 text-red-700 border border-red-100 rounded-full text-xs font-bold uppercase tracking-wider">Overdue</span>;
+        return <span className="shrink-0 px-3 py-1 bg-red-50 text-red-700 border border-red-100 rounded-full text-xs font-bold uppercase tracking-wider">Overdue</span>;
       case 'Completed':
-        return <span className="px-3 py-1 bg-slate-50 text-slate-600 border border-slate-200 rounded-full text-xs font-bold uppercase tracking-wider">Completed</span>;
+        return <span className="shrink-0 px-3 py-1 bg-slate-50 text-slate-600 border border-slate-200 rounded-full text-xs font-bold uppercase tracking-wider">Completed</span>;
       default:
         return null;
     }
@@ -123,8 +123,8 @@ export const TemporaryAssignments = () => {
                 onClick={() => navigate(`/tenants/${assignment.tenantId}`)}
                 className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group flex flex-col gap-5"
               >
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center font-bold shrink-0">
                       <User size={20} />
                     </div>
@@ -157,15 +157,21 @@ export const TemporaryAssignments = () => {
                   <div className="flex items-center gap-2">
                     <Calendar size={14} className="text-slate-400 shrink-0" />
                     <span className="text-xs font-bold text-slate-600">
-                      {new Date(assignment.temp_start_date).toLocaleDateString(undefined, { timeZone: 'UTC' })}
+                      {assignment.startDate 
+                        ? (!isNaN(new Date(assignment.startDate).getTime()) 
+                            ? new Date(assignment.startDate).toLocaleDateString() 
+                            : assignment.startDate)
+                        : 'N/A'}
                     </span>
                   </div>
                   <div className="text-slate-300">→</div>
                   <div className="flex items-center gap-2">
                     <Clock size={14} className={assignment.status === 'Overdue' ? 'text-red-400 shrink-0' : 'text-slate-400 shrink-0'} />
                     <span className={`text-xs font-bold ${assignment.status === 'Overdue' ? 'text-red-600' : 'text-slate-600'}`}>
-                      {assignment.temp_expected_end_date 
-                        ? new Date(assignment.temp_expected_end_date).toLocaleDateString(undefined, { timeZone: 'UTC' }) 
+                      {assignment.expectedEndDate 
+                        ? (!isNaN(new Date(assignment.expectedEndDate).getTime())
+                            ? new Date(assignment.expectedEndDate).toLocaleDateString()
+                            : assignment.expectedEndDate)
                         : 'TBD'}
                     </span>
                   </div>

@@ -218,6 +218,7 @@ export const Tenants = () => {
   /* 🔗 HANDLE URL PARAMS */
   useEffect(() => {
     if (id) {
+      if (loading) return; // Wait until data is loaded
       const tenantId = parseInt(id);
       const found = tenants.find(t => t.id === tenantId);
       if (found) {
@@ -231,7 +232,7 @@ export const Tenants = () => {
       setViewingTenant(null);
       setErrorNotFound(false);
     }
-  }, [id, tenants]);
+  }, [id, tenants, loading]);
 
 
 
@@ -1205,6 +1206,7 @@ export const Tenants = () => {
   ========================= */
 
 const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Details');
   const [loading, setLoading] = useState(false);
   const [tenantData, setTenantData] = useState({
@@ -1624,6 +1626,42 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                 <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Tenant ID</h4>
                 <p className="font-mono text-sm text-slate-600">TEN-{tenantData.id}</p>
               </div>
+
+              {(() => {
+                const tempLease = leases?.find(l => l.temp_unit_id) || tenantData.leases?.find(l => l.temp_unit_id);
+                if (!tempLease) return null;
+                return (
+                  <div className="md:col-span-3 bg-blue-50/50 p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm font-bold text-blue-600 uppercase tracking-wider flex items-center gap-2">
+                        <Home size={16} />
+                        Temporary Assignment Active
+                      </h4>
+                      <Button variant="secondary" onClick={() => handleEndTempAssignment(tempLease)} className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300 transition-colors py-1.5 px-3 text-xs">
+                        End Temporary Assignment
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-xs text-blue-400 font-medium">Temporary Unit</p>
+                        <p className="text-sm font-bold text-blue-800">{tempLease.temp_unit?.name || tempLease.temp_unit?.unitNumber || tempLease.temp_unit_id}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-blue-400 font-medium">Temporary Building</p>
+                        <p className="text-sm font-bold text-blue-800">{tempLease.temp_building?.name || tempLease.temp_building_id || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-blue-400 font-medium">Start Date</p>
+                        <p className="text-sm font-bold text-blue-800">{tempLease.temp_start_date ? new Date(tempLease.temp_start_date).toLocaleDateString() : 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-blue-400 font-medium">Expected End Date</p>
+                        <p className="text-sm font-bold text-blue-800">{tempLease.temp_expected_end_date ? new Date(tempLease.temp_expected_end_date).toLocaleDateString() : 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="md:col-span-2 space-y-6">
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
