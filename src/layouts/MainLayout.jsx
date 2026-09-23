@@ -114,8 +114,6 @@ export const MainLayout = ({ children, title = 'Overview' }) => {
                     ) : children}
                 </main>
                 
-                {/* Global AI Assistant */}
-                <AIAssistant />
             </div>
         </div>
     );

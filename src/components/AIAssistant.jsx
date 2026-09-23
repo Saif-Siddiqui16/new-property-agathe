@@ -142,16 +142,14 @@ export const AIAssistant = () => {
 
     return (
         <>
-            {/* FAB Button */}
+            {/* Topbar Icon Button */}
             {!isOpen && (
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="fixed bottom-6 right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-transform hover:scale-110 z-50 animate-bounce group"
+                    className="relative p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                    title="Ask AI Assistant"
                 >
-                    <Bot size={28} />
-                    <span className="absolute -top-10 right-0 bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg">
-                        Ask AI Assistant
-                    </span>
+                    <Bot size={20} />
                 </button>
             )}
 

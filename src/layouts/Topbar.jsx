@@ -3,6 +3,7 @@ import { Search, Menu, LogOut, MessageSquare } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../components/Button';
+import { AIAssistant } from '../components/AIAssistant';
 import api from '../api/client';
 import clsx from 'clsx';
 
@@ -105,6 +106,9 @@ export const Topbar = ({ title = 'Overview', onMenuClick }) => {
                         </span>
                     )}
                 </Link>
+
+                {/* AI ASSISTANT TOGGLE */}
+                <AIAssistant />
 
                 {/* LANGUAGE SWITCHER */}
                 <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-1 h-10 notranslate">

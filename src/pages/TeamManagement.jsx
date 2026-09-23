@@ -72,6 +72,7 @@ const MODULES = [
   'Dashboard', 'Overview', 'Vacancy Dashboard', 'Revenue Dashboard',
   'Properties', 'Buildings', 'Units', 'Unit Readiness',
   'Tenants', 'Tenant List', 'Vehicles', 'Insurance', 
+  'Temporary Assignment', 'Locker Inventory',
   'Shuttle',
   'Leases',
   'Rent Roll',

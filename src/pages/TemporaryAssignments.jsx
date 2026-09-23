@@ -4,6 +4,7 @@ import { Button } from '../components/Button';
 import { Search, Home, Building2, Calendar, User, Clock, CheckCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import { TemporaryAssignmentModal } from '../components/TemporaryAssignmentModal';
 
 export const TemporaryAssignments = () => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export const TemporaryAssignments = () => {
   const [assignments, setAssignments] = useState([]);
   const [filterStatus, setFilterStatus] = useState('Active'); // Active, Completed
   const [search, setSearch] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [__forceUpdate, __setForceUpdate] = useState(0);
   useEffect(() => {
@@ -72,6 +74,11 @@ export const TemporaryAssignments = () => {
         
         {/* Header & Controls */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <Button variant="primary" onClick={() => setIsModalOpen(true)}>
+              + Add Temporary Assignment
+            </Button>
+          </div>
           <div className="flex items-center gap-2 bg-slate-100/50 p-1 rounded-xl w-full md:w-auto overflow-x-auto">
             <button 
               onClick={() => setFilterStatus('Active')}
@@ -188,6 +195,11 @@ export const TemporaryAssignments = () => {
         )}
 
       </div>
+      <TemporaryAssignmentModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={fetchAssignments}
+      />
     </MainLayout>
   );
 };
