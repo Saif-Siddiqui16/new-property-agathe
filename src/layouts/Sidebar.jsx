@@ -126,7 +126,11 @@ const NAV_ITEMS = [
     icon: PieChart,
     label: "Reports",
     tKey: "sidebar.reports",
-    path: "/reports"
+    path: "/reports",
+    children: [
+      { label: "Dashboard Analytics", path: "/reports" },
+      { label: "Monthly Rent & Collections", path: "/reports/monthly-rent-collections" }
+    ]
   },
   {
     icon: MessageSquare,
@@ -242,7 +246,7 @@ const NavItem = ({ item, depth = 0, onClose }) => {
     <>
       <NavLink
         to={item.path}
-        end={item.path === '/tenants' || item.path === '/dashboard' || item.path === '/properties/buildings' || item.path === '/accounting'}
+        end={item.path === '/tenants' || item.path === '/dashboard' || item.path === '/properties/buildings' || item.path === '/accounting' || item.path === '/reports'}
         onClick={handleClick}
         className={({ isActive }) =>
           clsx(
@@ -404,6 +408,8 @@ export const Sidebar = ({ isOpen, onClose, permissionsReady = true }) => {
               'Chart of Accounts': 'Chart of Accounts',
               'Tax Settings': 'Tax Settings',
               'Reports': 'Reports',
+              'Dashboard Analytics': 'Reports',
+              'Monthly Rent & Collections': 'Monthly Rent & Collections',
               'SMS Hub': 'Communication',
               'Inbox': 'Inbox',
               'Campaign Manager': 'Campaign Manager',

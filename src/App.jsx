@@ -51,6 +51,7 @@ import { QuickBooksSettings } from "./pages/QuickBooksSettings";
 
 /* REPORTS & SETTINGS */
 import Reports from "./pages/Reports";
+import MonthlyRentReport from "./pages/MonthlyRentReport";
 import { Maintenance } from "./pages/Maintenance";
 import { Tickets } from "./pages/Tickets";
 import Communication from "./pages/Communication";
@@ -166,6 +167,7 @@ function App() {
 
           {/* REPORTS & SETTINGS */}
           <Route path="/reports" element={<Reports />} />
+          <Route path="/reports/monthly-rent-collections" element={<MonthlyRentReport />} />
           <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/communication" element={<Communication />} />
           <Route path="/admin/email/composer" element={<EmailComposer />} />
