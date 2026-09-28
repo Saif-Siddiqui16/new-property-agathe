@@ -634,6 +634,28 @@ export const UnitDetail = () => {
                                     Download Lease PDF
                                 </Button>
                             )}
+                            {viewingHistoryItem.linkType === 'Inspection' && (
+                                <Button 
+                                    variant="primary" 
+                                    className="flex-1 gap-2"
+                                    onClick={() => {
+                                        window.location.href = `/admin/workflow/inspections/${viewingHistoryItem.linkId}`;
+                                    }}
+                                >
+                                    View Inspection
+                                </Button>
+                            )}
+                            {viewingHistoryItem.linkType === 'Ticket' && (
+                                <Button 
+                                    variant="primary" 
+                                    className="flex-1 gap-2"
+                                    onClick={() => {
+                                        window.location.href = '/tickets';
+                                    }}
+                                >
+                                    Go to Tickets
+                                </Button>
+                            )}
                             <Button variant="secondary" className="flex-1" onClick={() => setViewingHistoryItem(null)}>Close</Button>
                         </div>
                     </div>
