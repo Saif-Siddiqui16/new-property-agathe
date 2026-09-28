@@ -1219,6 +1219,11 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
   const [policies, setPolicies] = useState(tenant.insurance || []);
   const [leases, setLeases] = useState([]);
   const [tickets, setTickets] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyItemsPerPage = 5;
+  const [viewingHistoryItem, setViewingHistoryItem] = useState(null);
   const [showTempUnitModal, setShowTempUnitModal] = useState(false);
   const [tempUnitLease, setTempUnitLease] = useState(null);
   const [tempBuildingId, setTempBuildingId] = useState('');
@@ -1338,6 +1343,24 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
       console.error("Failed to fetch tickets", e);
     }
   };
+
+  const fetchHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      const res = await api.get(`/api/admin/tenants/${tenant.id}/history`);
+      setHistory(res.data || []);
+    } catch (e) {
+      console.error("Failed to fetch history", e);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'History' && tenant?.id) {
+      fetchHistory();
+    }
+  }, [activeTab, tenant]);
 
   // Modals state
   const [showAddInsurance, setShowAddInsurance] = useState(false);
@@ -1584,7 +1607,7 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
 
         {/* TABS */}
         <div className="flex border-b border-slate-200 gap-8 px-2 overflow-x-auto no-scrollbar">
-          {['Details', 'Leases', 'Documents', 'Insurance', 'Tickets'].map(tab => (
+          {['Details', 'Leases', 'Documents', 'Insurance', 'Tickets', 'History'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -2194,6 +2217,70 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
             </div>
           )}
 
+          {activeTab === 'History' && (
+            <div className="space-y-6">
+              <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                  <h4 className="font-bold text-slate-800">Timeline</h4>
+                </div>
+                <div className="p-6">
+                  {loadingHistory ? (
+                    <div className="py-12 text-center text-slate-400">Loading history...</div>
+                  ) : history.length > 0 ? (
+                    <div className="space-y-6">
+                      <div className="relative border-l-2 border-slate-200 ml-4 space-y-8 pb-4">
+                        {history.slice((historyPage - 1) * historyItemsPerPage, historyPage * historyItemsPerPage).map((item, index) => (
+                          <div key={index} className="relative pl-6">
+                            <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-2 border-indigo-500"></div>
+                            <div 
+                              className="bg-slate-50 border border-slate-100 p-4 rounded-xl shadow-sm cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
+                              onClick={() => setViewingHistoryItem(item)}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <h5 className="font-bold text-slate-700 group-hover:text-indigo-600 transition-colors">{item.type}</h5>
+                                <span className="text-xs font-semibold text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-100">
+                                  {new Date(item.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                                </span>
+                              </div>
+                              <p className="text-sm text-slate-600">{item.description}</p>
+                              {item.content && (
+                                <div className="mt-2 text-xs text-slate-500 italic bg-white p-2 rounded border border-slate-100 line-clamp-2">
+                                  "{item.content}"
+                                </div>
+                              )}
+                              <div className="mt-3 text-[10px] font-bold text-indigo-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                                Click to view details
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {Math.ceil(history.length / historyItemsPerPage) > 1 && (
+                        <div className="flex justify-center items-center gap-2 pt-6 border-t border-slate-100">
+                          <Button variant="secondary" onClick={() => setHistoryPage(p => Math.max(1, p - 1))} disabled={historyPage === 1}>Prev</Button>
+                          <div className="flex items-center gap-1">
+                            {[...Array(Math.ceil(history.length / historyItemsPerPage))].map((_, i) => (
+                              <button
+                                key={i}
+                                onClick={() => setHistoryPage(i + 1)}
+                                className={`w-8 h-8 rounded-lg text-sm font-bold transition-all ${historyPage === i + 1 ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}
+                              >
+                                {i + 1}
+                              </button>
+                            ))}
+                          </div>
+                          <Button variant="secondary" onClick={() => setHistoryPage(p => Math.min(Math.ceil(history.length / historyItemsPerPage), p + 1))} disabled={historyPage === Math.ceil(history.length / historyItemsPerPage)}>Next</Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="py-12 text-center text-slate-400 italic">No history available for this tenant.</div>
+                  )}
+                </div>
+              </section>
+            </div>
+          )}
+
         </div>
 
         {/* ADD/EDIT INSURANCE MODAL */}
@@ -2764,6 +2851,79 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                   <Button type="submit" variant="primary">Assign Temporary Unit</Button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* HISTORY ITEM PREVIEW MODAL */}
+        {viewingHistoryItem && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[80] animate-in fade-in duration-200" onClick={() => setViewingHistoryItem(null)}>
+            <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-800">{viewingHistoryItem.type}</h3>
+                  <p className="text-sm text-slate-500 mt-1">{new Date(viewingHistoryItem.date).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })}</p>
+                </div>
+                <button onClick={() => setViewingHistoryItem(null)} className="text-slate-400 hover:text-slate-600 transition-all bg-slate-50 hover:bg-slate-100 p-2 rounded-full">✕</button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Description / Subject</p>
+                  <p className="font-medium text-slate-700">{viewingHistoryItem.description}</p>
+                </div>
+
+                {viewingHistoryItem.content && (
+                  <div className="p-4 rounded-xl bg-indigo-50/30 border border-indigo-100">
+                    <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">Message Content</p>
+                    <p className="text-sm text-slate-600 whitespace-pre-wrap">{viewingHistoryItem.content}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                {viewingHistoryItem.linkType === 'Document' && (
+                  <Button 
+                    variant="primary" 
+                    className="flex-1 gap-2"
+                    onClick={async () => {
+                      try {
+                        const token = localStorage.getItem('accessToken');
+                        const baseURL = api.defaults.baseURL || 'http://localhost:5000';
+                        const normalizedBaseURL = baseURL.replace(/\/$/, "");
+                        window.open(`${normalizedBaseURL}/api/admin/documents/${viewingHistoryItem.linkId}/download?disposition=inline&token=${token}`, '_blank');
+                      } catch (e) {
+                        alert('Could not open document.');
+                      }
+                    }}
+                  >
+                    <FileText size={18} />
+                    Open Document
+                  </Button>
+                )}
+                {viewingHistoryItem.linkType === 'Lease' && (
+                  <Button 
+                    variant="primary" 
+                    className="flex-1 gap-2"
+                    onClick={async () => {
+                      try {
+                        const res = await api.get(`/api/admin/leases/${viewingHistoryItem.linkId}/download?disposition=attachment`, { responseType: 'blob' });
+                        const url = window.URL.createObjectURL(res.data);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.setAttribute('download', `lease-${viewingHistoryItem.linkId}.pdf`);
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                      } catch (e) { alert('Download failed'); }
+                    }}
+                  >
+                    <Download size={18} />
+                    Download Lease PDF
+                  </Button>
+                )}
+                <Button variant="secondary" className="flex-1" onClick={() => setViewingHistoryItem(null)}>Close</Button>
+              </div>
             </div>
           </div>
         )}
