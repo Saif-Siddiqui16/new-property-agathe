@@ -29,22 +29,26 @@ const NewInspectionWizard = () => {
         inspectorId: '1',
         date: new Date().toISOString().split('T')[0],
         time: '',
-        isTempUnit: false
+        isTempUnit: false,
+        selectedTenantId: '',
+        manualTenantName: ''
     });
     const [loading, setLoading] = useState(false);
     const [units, setUnits] = useState([]);
     const [templates, setTemplates] = useState([]);
     const [properties, setProperties] = useState([]);
     const [inspectors, setInspectors] = useState([]);
+    const [tenants, setTenants] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [unitsRes, templatesRes, propertiesRes, coworkersRes] = await Promise.all([
+                const [unitsRes, templatesRes, propertiesRes, coworkersRes, tenantsRes] = await Promise.all([
                     api.get('/api/admin/workflow/units'),
                     api.get('/api/admin/workflow/templates'),
                     api.get('/api/admin/properties'),
-                    api.get('/api/admin/coworkers')
+                    api.get('/api/admin/coworkers'),
+                    api.get('/api/admin/tenants')
                 ]);
 
                 const moveInUnits = unitsRes.data.success ? (unitsRes.data.data || unitsRes.data) : [];
@@ -57,6 +61,9 @@ const NewInspectionWizard = () => {
 
                 const staffData = coworkersRes.data.data || coworkersRes.data;
                 setInspectors(Array.isArray(staffData) ? staffData : []);
+
+                const tenantsData = tenantsRes.data.data || tenantsRes.data;
+                setTenants(Array.isArray(tenantsData) ? tenantsData : []);
 
                 // Auto-fill from location state
                 if (location.state?.moveInId || location.state?.moveOutId || location.state?.unitId) {
@@ -136,8 +143,10 @@ const NewInspectionWizard = () => {
                 leaseId: formData.leaseId ? parseInt(formData.leaseId) : null,
                 inspectorId: formData.inspectorId ? parseInt(formData.inspectorId) : null,
                 tenantId: formData.selectedTenantId ? parseInt(formData.selectedTenantId) : null,
+                manualTenantName: formData.manualTenantName || null,
                 date: formData.date,
-                time: formData.time
+                time: formData.time,
+                isTempUnit: formData.isTempUnit
             });
 
             if (res.data.success) {
@@ -272,6 +281,8 @@ const NewInspectionWizard = () => {
                                     </select>
                                 </InputGroup>
 
+
+
                                 <div className="md:col-span-2">
                                     <label className="flex items-center gap-3 cursor-pointer p-4 rounded-2xl border border-gray-200 hover:bg-indigo-50/50 transition-colors">
                                         <input
@@ -303,34 +314,31 @@ const NewInspectionWizard = () => {
                                     </select>
                                 </InputGroup>
 
-                                <InputGroup label="Tenant" required>
-                                    {(() => {
-                                        const selectedUnit = units.find(u => u.unitId === parseInt(formData.unitId));
-                                        const tenantList = selectedUnit?.tenants || [];
-                                        if (tenantList.length <= 1) {
-                                            return (
-                                                <div className="w-full px-4 py-3 bg-gray-100 border border-gray-100 rounded-2xl text-sm font-bold text-gray-500 truncate">
-                                                    {selectedUnit
-                                                        ? (selectedUnit.tenantName || selectedUnit.lease?.tenant?.name || 'No tenant linked')
-                                                        : 'Select a unit first'}
-                                                </div>
-                                            );
-                                        }
-                                        return (
-                                            <select
-                                                value={formData.selectedTenantId || ''}
-                                                onChange={(e) => setFormData({ ...formData, selectedTenantId: e.target.value })}
+                                <InputGroup label="Tenant Name (Optional)">
+                                    <div className="flex flex-col gap-3">
+                                        <select
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                                            value={formData.selectedTenantId}
+                                            onChange={(e) => setFormData({ ...formData, selectedTenantId: e.target.value, manualTenantName: '' })}
+                                        >
+                                            <option value="">Auto-detect from Unit / Type manually</option>
+                                            {tenants.map(t => (
+                                                <option key={t.id} value={t.id.toString()}>
+                                                    {t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() || t.email}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        {!formData.selectedTenantId && (
+                                            <input
+                                                type="text"
+                                                placeholder="Or manually type a name (e.g. Guest)"
                                                 className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all"
-                                            >
-                                                <option value="">Select tenant name for this inspection</option>
-                                                {tenantList.map(t => (
-                                                    <option key={t.id} value={t.id.toString()}>
-                                                        {t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() || `Tenant #${t.id}`}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        );
-                                    })()}
+                                                value={formData.manualTenantName}
+                                                onChange={(e) => setFormData({ ...formData, manualTenantName: e.target.value })}
+                                            />
+                                        )}
+                                    </div>
                                 </InputGroup>
                             </div>
 
