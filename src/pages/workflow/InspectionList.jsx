@@ -25,6 +25,8 @@ const InspectionList = () => {
     const navigate = useNavigate();
     const [inspections, setInspections] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [editingTenantId, setEditingTenantId] = useState(null);
+    const [editingTenantName, setEditingTenantName] = useState('');
     const [pagination, setPagination] = useState({
         total: 0,
         page: 1,
@@ -45,6 +47,20 @@ const InspectionList = () => {
         fetchInspections();
     }, [pagination.page]);
 
+    const handleUpdateTenantName = async (e, inspId) => {
+        e.stopPropagation();
+        try {
+            await api.patch(`/api/admin/workflow/inspections/${inspId}`, {
+                manualTenantName: editingTenantName
+            });
+            fetchInspections();
+        } catch (error) {
+            alert('Failed to update tenant name: ' + (error.response?.data?.message || error.message));
+        } finally {
+            setEditingTenantId(null);
+        }
+    };
+
     const fetchInspections = async () => {
         try {
             setLoading(true);
@@ -54,7 +70,7 @@ const InspectionList = () => {
                     id: insp.id,
                     type: insp.template?.name || (insp.template?.type === 'MOVE_OUT' ? 'Move-Out' : 'Move-In'),
                     unit: insp.unit?.name || 'Unknown',
-                    tenant: insp.lease?.tenant?.name || 'No Tenant',
+                    tenant: insp.lease?.tenant?.name || insp.manualTenantName || 'No Tenant',
                     date: format(new Date(insp.createdAt), 'MMM dd, yyyy'),
                     inspector: insp.inspector?.name || 'N/A',
                     status: insp.status === 'DRAFT' ? 'In Progress' : (insp.status === 'COMPLETED' ? 'Completed' : 'Scheduled'),
@@ -205,13 +221,36 @@ const InspectionList = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 font-black text-gray-700">{insp.unit}</td>
-                                        <td className="px-6 py-4 hidden lg:table-cell">
-                                            <div className="flex items-center gap-2 text-sm font-bold text-gray-600">
-                                                <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center text-[10px] text-indigo-600">
-                                                    {insp.tenant.charAt(0)}
+                                        <td className="px-6 py-4 hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
+                                            {editingTenantId === insp.id ? (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        autoFocus
+                                                        type="text"
+                                                        value={editingTenantName}
+                                                        onChange={(e) => setEditingTenantName(e.target.value)}
+                                                        onKeyDown={(e) => { if(e.key === 'Enter') handleUpdateTenantName(e, insp.id); }}
+                                                        className="px-2 py-1 border border-indigo-200 rounded text-sm outline-none focus:border-indigo-500 w-[120px]"
+                                                    />
+                                                    <button onClick={(e) => handleUpdateTenantName(e, insp.id)} className="text-xs text-white bg-indigo-600 px-2 py-1 rounded">Save</button>
+                                                    <button onClick={(e) => { e.stopPropagation(); setEditingTenantId(null); }} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
                                                 </div>
-                                                <span className="truncate max-w-[120px]">{insp.tenant}</span>
-                                            </div>
+                                            ) : (
+                                                <div 
+                                                    className={`flex items-center gap-2 text-sm font-bold text-gray-600 p-1 rounded -ml-1 ${insp.tenant === 'No Tenant' ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
+                                                    onClick={(e) => {
+                                                        if (insp.tenant !== 'No Tenant') return;
+                                                        e.stopPropagation();
+                                                        setEditingTenantId(insp.id);
+                                                        setEditingTenantName('');
+                                                    }}
+                                                >
+                                                    <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center text-[10px] text-indigo-600 shrink-0">
+                                                        {insp.tenant.charAt(0)}
+                                                    </div>
+                                                    <span className="truncate max-w-[120px]" title={insp.tenant === 'No Tenant' ? "Click to edit" : ""}>{insp.tenant}</span>
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-sm font-bold text-gray-500 hidden md:table-cell">{insp.date}</td>
                                         <td className="px-6 py-4">

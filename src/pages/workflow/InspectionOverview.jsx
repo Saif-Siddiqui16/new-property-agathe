@@ -169,7 +169,7 @@ const InspectionOverview = () => {
                                     <h3 className="text-lg font-black text-gray-900 mb-6 tracking-tight uppercase tracking-widest text-[11px] text-gray-400">Assignment & Location</h3>
                                     <div className="flex flex-col gap-5">
                                         <DetailRow label="Inspector" value={inspection.inspector?.name} icon={User} />
-                                        <DetailRow label="Tenant" value={inspection.lease?.tenant?.name || 'N/A'} icon={User} />
+                                        <DetailRow label="Tenant" value={inspection.lease?.tenant?.name || inspection.manualTenantName || 'N/A'} icon={User} />
                                         <DetailRow label="Unit / Bedroom" value={inspection.unit?.name} icon={Home} />
                                         <DetailRow label="Unit Type" value={inspection.unit?.unitType || 'Standard'} />
                                         <DetailRow label="Priority" value="Normal" status="orange" />
@@ -369,7 +369,7 @@ const InspectionOverview = () => {
                             </div>
                             <div className="flex items-center justify-between text-xs font-bold text-gray-900">
                                 <span>Tenant</span>
-                                <span className="text-gray-500">{inspection.lease?.tenant?.name || 'N/A'}</span>
+                                <span className="text-gray-500">{inspection.lease?.tenant?.name || inspection.manualTenantName || 'N/A'}</span>
                             </div>
                         </div>
                     </div>
