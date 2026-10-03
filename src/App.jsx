@@ -58,6 +58,7 @@ import Communication from "./pages/Communication";
 import EmailComposer from "./pages/EmailComposer";
 import EmailTemplates from "./pages/EmailTemplates";
 import EmailHistory from "./pages/EmailHistory";
+import { ReceivedEmails } from "./pages/ReceivedEmails";
 import Settings from "./pages/Settings";
 import { Owners } from "./pages/Owners";
 import { TeamManagement } from "./pages/TeamManagement";
@@ -173,6 +174,7 @@ function App() {
           <Route path="/admin/email/composer" element={<EmailComposer />} />
           <Route path="/admin/email/templates" element={<EmailTemplates />} />
           <Route path="/admin/email/history" element={<EmailHistory />} />
+          <Route path="/admin/email/received" element={<ReceivedEmails />} />
           <Route path="/tickets" element={<Tickets />} />
           <Route path="/team-management" element={<TeamManagement />} />
           <Route path="/settings" element={<Settings />} />

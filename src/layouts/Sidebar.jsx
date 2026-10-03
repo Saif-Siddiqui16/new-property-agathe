@@ -151,7 +151,8 @@ const NAV_ITEMS = [
     children: [
       { label: "Send Email", tKey: "sidebar.send_email", path: "/admin/email/composer" },
       { label: "Email Templates", tKey: "sidebar.email_templates", path: "/admin/email/templates" },
-      { label: "Sent Emails", tKey: "sidebar.email_history", path: "/admin/email/history" }
+      { label: "Sent Emails", tKey: "sidebar.email_history", path: "/admin/email/history" },
+      { label: "Received Emails", tKey: "sidebar.received_emails", path: "/admin/email/received" }
     ]
   },
   {
@@ -418,6 +419,7 @@ export const Sidebar = ({ isOpen, onClose, permissionsReady = true }) => {
               'Send Email': 'Send Email',
               'Email Templates': 'Email Templates',
               'Sent Emails': 'Sent Emails',
+              'Received Emails': 'Received Emails',
               'Maintenance': 'Maintenance',
               'Tickets': 'Tickets',
               'Inspections': 'Inspections',

@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { MainLayout } from '../layouts/MainLayout';
 import { hasPermission } from '../utils/permissions';
 
-const EmailHistory = () => {
+export const ReceivedEmails = () => {
     const [__forceUpdate, __setForceUpdate] = useState(0);
     useEffect(() => {
         const handleUpdate = () => __setForceUpdate(p => p + 1);
@@ -13,7 +13,7 @@ const EmailHistory = () => {
         return () => window.removeEventListener('permissionsUpdated', handleUpdate);
     }, []);
 
-    if (!hasPermission('Sent Emails', 'view')) {
+    if (!hasPermission('Received Emails', 'view')) {
         return (
             <MainLayout title="Permission Denied">
                 <div className="p-12 text-center bg-white rounded-[2rem] border border-slate-100 shadow-sm mt-8">
@@ -57,7 +57,7 @@ const EmailHistory = () => {
     const fetchHistory = async (page = 1) => {
         setLoading(true);
         try {
-            const params = { ...filters, page, limit: pagination.limit, direction: 'outbound' };
+            const params = { ...filters, page, limit: pagination.limit, direction: 'inbound' };
             const queryParams = new URLSearchParams(params).toString();
             const response = await api.get(`/api/admin/email/history?${queryParams}`);
             
@@ -120,15 +120,15 @@ const EmailHistory = () => {
     };
 
     return (
-        <MainLayout title="Sent Emails History">
+        <MainLayout title="Received Emails History">
             <div className="space-y-6">
                 <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                             <History className="h-6 w-6 text-indigo-600" />
-                            Sent Emails Dashboard
+                            Received Emails Dashboard
                         </h1>
-                        <p className="text-gray-500 mt-1">Track and manage all outgoing communications.</p>
+                        <p className="text-gray-500 mt-1">Track and manage all incoming tenant replies.</p>
                     </div>
                 </div>
 
@@ -424,5 +424,3 @@ const EmailHistory = () => {
         </MainLayout>
     );
 };
-
-export default EmailHistory;
