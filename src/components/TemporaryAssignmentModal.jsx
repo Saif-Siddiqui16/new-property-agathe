@@ -27,7 +27,7 @@ export const TemporaryAssignmentModal = ({ isOpen, onClose, onSuccess }) => {
 
   const fetchTenants = async () => {
     try {
-      const res = await api.get('/api/admin/tenants');
+      const res = await api.get('/api/admin/tenants?limit=1000');
       setTenants(res.data?.data || res.data || []);
     } catch (e) {
       console.error('Failed to fetch tenants', e);
