@@ -226,7 +226,9 @@ export const DocumentLibrary = () => {
     const getIcon = (type) => {
         switch (type) {
             case 'Insurance': return <Shield className="text-emerald-500" size={20} />;
-            case 'Lease': return <FileText className="text-indigo-500" size={20} />;
+            case 'Lease':
+            case 'Lease Extension': return <FileText className="text-indigo-500" size={20} />;
+            case 'Lease Cancellation': return <FileText className="text-rose-500" size={20} />;
             case 'Invoice': return <FileText className="text-amber-500" size={20} />;
             default: return <FileText className="text-slate-400" size={20} />;
         }
@@ -280,6 +282,8 @@ export const DocumentLibrary = () => {
                             >
                                 <option value="All">All Types</option>
                                 <option value="Lease">Leases</option>
+                                <option value="Lease Extension">Lease Extension</option>
+                                <option value="Lease Cancellation">Lease Cancellation</option>
                                 <option value="Insurance">Insurance</option>
                                 <option value="Refund Proof">Refund Proof</option>
                             </select>
@@ -501,6 +505,8 @@ export const DocumentLibrary = () => {
                                                 required
                                             >
                                                 <option value="Lease">Lease Agreement</option>
+                                                <option value="Lease Extension">Lease Extension</option>
+                                                <option value="Lease Cancellation">Lease Cancellation</option>
                                                 <option value="Insurance">Insurance Policy</option>
                                                 <option value="Refund Proof">Refund Proof</option>
                                                 <option value="ID">Identification</option>
