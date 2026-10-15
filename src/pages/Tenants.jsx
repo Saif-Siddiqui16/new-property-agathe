@@ -218,21 +218,42 @@ export const Tenants = () => {
   /* 🔗 HANDLE URL PARAMS */
   useEffect(() => {
     if (id) {
-      if (loading) return; // Wait until data is loaded
       const tenantId = parseInt(id);
+      if (viewingTenant && viewingTenant.id === tenantId) {
+        return;
+      }
+
       const found = tenants.find(t => t.id === tenantId);
       if (found) {
         setViewingTenant(found);
         setErrorNotFound(false);
       } else {
-        setViewingTenant(null);
-        setErrorNotFound(true);
+        // Fetch directly from API if not present in the current paginated/filtered list
+        api.get(`/api/admin/tenants/${tenantId}`)
+          .then(res => {
+            const data = res.data?.data || res.data;
+            if (data && data.id) {
+              setViewingTenant({
+                ...data,
+                name: data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim()
+              });
+              setErrorNotFound(false);
+            } else {
+              setViewingTenant(null);
+              setErrorNotFound(true);
+            }
+          })
+          .catch(err => {
+            console.error("Failed to fetch tenant by id", err);
+            setViewingTenant(null);
+            setErrorNotFound(true);
+          });
       }
     } else {
       setViewingTenant(null);
       setErrorNotFound(false);
     }
-  }, [id, tenants, loading]);
+  }, [id, tenants, viewingTenant]);
 
 
 
