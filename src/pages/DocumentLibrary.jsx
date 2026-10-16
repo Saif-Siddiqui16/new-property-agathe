@@ -19,7 +19,8 @@ import {
     RefreshCw,
     ChevronLeft,
     ChevronRight,
-    Edit
+    Edit,
+    Box
 } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -35,6 +36,7 @@ export const DocumentLibrary = () => {
     }, []);
 
     const [typeFilter, setTypeFilter] = useState("All");
+    const [propertyFilter, setPropertyFilter] = useState("All");
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -195,10 +197,24 @@ export const DocumentLibrary = () => {
     }, []);
 
     const filteredDocuments = documents.filter(doc => {
-        const matchesSearch = doc.name.toLowerCase().includes(search.toLowerCase()) ||
-            doc.user?.firstName?.toLowerCase().includes(search.toLowerCase()) ||
-            doc.user?.lastName?.toLowerCase().includes(search.toLowerCase());
+        const s = search.toLowerCase().trim();
+        const matchesSearch = !s ||
+            doc.name?.toLowerCase().includes(s) ||
+            doc.type?.toLowerCase().includes(s) ||
+            doc.user?.firstName?.toLowerCase().includes(s) ||
+            doc.user?.lastName?.toLowerCase().includes(s) ||
+            `${doc.user?.firstName || ''} ${doc.user?.lastName || ''}`.toLowerCase().includes(s) ||
+            doc.property?.name?.toLowerCase().includes(s) ||
+            doc.unit?.unitNumber?.toLowerCase().includes(s) ||
+            doc.unit?.name?.toLowerCase().includes(s) ||
+            (doc.leaseId && String(doc.leaseId).includes(s));
+
         const matchesType = typeFilter === "All" || doc.type === typeFilter;
+
+        const matchesProperty = propertyFilter === "All" ||
+            String(doc.propertyId) === String(propertyFilter) ||
+            String(doc.property?.id) === String(propertyFilter) ||
+            String(doc.unit?.propertyId) === String(propertyFilter);
         
         const today = new Date().setHours(0,0,0,0);
         const isExpired = doc.expiryDate && new Date(doc.expiryDate) < today;
@@ -207,7 +223,7 @@ export const DocumentLibrary = () => {
         else if (expiryFilter === "Active") matchesExpiry = !isExpired && doc.expiryDate;
         else if (expiryFilter === "No Expiry") matchesExpiry = !doc.expiryDate;
 
-        return matchesSearch && matchesType && matchesExpiry;
+        return matchesSearch && matchesType && matchesProperty && matchesExpiry;
     });
 
     const sortedDocuments = useMemo(() => {
@@ -228,6 +244,7 @@ export const DocumentLibrary = () => {
             case 'Insurance': return <Shield className="text-emerald-500" size={20} />;
             case 'Lease':
             case 'Lease Extension': return <FileText className="text-indigo-500" size={20} />;
+            case 'Locker Lease': return <Box className="text-cyan-500" size={20} />;
             case 'Lease Cancellation': return <FileText className="text-rose-500" size={20} />;
             case 'Invoice': return <FileText className="text-amber-500" size={20} />;
             default: return <FileText className="text-slate-400" size={20} />;
@@ -266,30 +283,48 @@ export const DocumentLibrary = () => {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                             type="text"
-                            placeholder="Search by filename or tenant..."
+                            placeholder="Search by filename, tenant, building, or unit..."
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
                             className="w-full pl-12 pr-5 py-3.5 rounded-[18px] border border-slate-200 outline-none focus:border-indigo-500 font-medium text-slate-700 bg-slate-50 focus:bg-white transition-all shadow-inner"
                         />
                     </div>
-                    <div className="flex items-center gap-4 w-full md:w-auto">
+                    <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
                         <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm">
-                            <Filter size={16} className="text-slate-400" />
+                            <Building size={16} className="text-slate-400 shrink-0" />
+                            <select
+                                value={propertyFilter}
+                                onChange={(e) => { setPropertyFilter(e.target.value); setCurrentPage(1); }}
+                                className="outline-none bg-transparent cursor-pointer max-w-[150px] truncate"
+                            >
+                                <option value="All">All Buildings</option>
+                                {dropdownData.properties?.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name}{p.civicNumber ? ` (${p.civicNumber})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm">
+                            <Filter size={16} className="text-slate-400 shrink-0" />
                             <select
                                 value={typeFilter}
-                                onChange={(e) => setTypeFilter(e.target.value)}
+                                onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}
                                 className="outline-none bg-transparent cursor-pointer"
                             >
                                 <option value="All">All Types</option>
                                 <option value="Lease">Leases</option>
+                                <option value="Locker Lease">Locker Lease</option>
                                 <option value="Lease Extension">Lease Extension</option>
                                 <option value="Lease Cancellation">Lease Cancellation</option>
                                 <option value="Insurance">Insurance</option>
                                 <option value="Refund Proof">Refund Proof</option>
+                                <option value="ID">Identification</option>
+                                <option value="Other">Other</option>
                             </select>
                         </div>
                         <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm">
-                            <Clock size={16} className="text-slate-400" />
+                            <Clock size={16} className="text-slate-400 shrink-0" />
                             <select
                                 value={expiryFilter}
                                 onChange={(e) => { setExpiryFilter(e.target.value); setCurrentPage(1); }}
@@ -304,7 +339,13 @@ export const DocumentLibrary = () => {
                         <Button
                             variant="secondary"
                             className="h-14 px-6 rounded-[18px]"
-                            onClick={() => { setSearch(""); setTypeFilter("All"); setExpiryFilter("All"); setCurrentPage(1); }}
+                            onClick={() => {
+                                setSearch("");
+                                setPropertyFilter("All");
+                                setTypeFilter("All");
+                                setExpiryFilter("All");
+                                setCurrentPage(1);
+                            }}
                         >
                             Reset
                         </Button>
@@ -505,6 +546,7 @@ export const DocumentLibrary = () => {
                                                 required
                                             >
                                                 <option value="Lease">Lease Agreement</option>
+                                                <option value="Locker Lease">Locker Lease</option>
                                                 <option value="Lease Extension">Lease Extension</option>
                                                 <option value="Lease Cancellation">Lease Cancellation</option>
                                                 <option value="Insurance">Insurance Policy</option>
