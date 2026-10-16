@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Trash2, X, FileText, Calendar, User, Home, Bed, AlertTriangle, CheckCircle, Search, ChevronLeft, ChevronRight, Plus, Lock } from 'lucide-react';
+import { Eye, Pencil, Trash2, X, FileText, Calendar, User, Home, Bed, AlertTriangle, CheckCircle, Search, ChevronLeft, ChevronRight, Plus, Lock, Building2 } from 'lucide-react';
 import { Button } from '../components/Button';
 import api from '../api/client';
 import { hasPermission } from '../utils/permissions';
@@ -124,6 +124,11 @@ export const LeaseHistory = () => {
 
     /* SAVE EDIT */
     const handleEditSave = async (e) => {
+        if ((editLease.tenantType === 'COMPANY' || editLease.companyName) && !editLease.companyName?.trim()) {
+            alert('Company Name is required.');
+            return;
+        }
+
         if (!editLease.tenantFirstName?.trim() || !editLease.tenantLastName?.trim()) {
             alert('First Name and Last Name are required.');
             return;
@@ -137,6 +142,7 @@ export const LeaseHistory = () => {
                 endDate: editLease.endDate,
                 firstName: editLease.tenantFirstName,
                 lastName: editLease.tenantLastName,
+                companyName: editLease.companyName,
                 lockers: [
                     // Existing locker edits (end date changes)
                     ...leaseLockers
@@ -293,7 +299,25 @@ export const LeaseHistory = () => {
                                             <div className="font-semibold text-slate-800">{lease.unit}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lease.bedroom}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-700">{lease.tenant}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {lease.companyName ? (
+                                                <div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-sm font-bold text-slate-800">{lease.companyName}</span>
+                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-wider">Company</span>
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                                                        <span className="text-slate-400 font-medium">Rep:</span>
+                                                        <span className="font-medium text-slate-600">{lease.responsiblePerson || lease.primaryTenantName || lease.tenant}</span>
+                                                        {lease.coTenants && lease.coTenants.length > 0 && (
+                                                            <span className="text-slate-400">({lease.coTenants.join(', ')})</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm font-medium text-slate-700">{lease.tenant}</span>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-mono text-[13px]">{lease.term}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-700">${(lease.monthlyRent || 0).toLocaleString('en-CA')}</td>
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -426,10 +450,32 @@ export const LeaseHistory = () => {
                                     <span className="text-sm font-medium text-slate-500">Bedroom</span>
                                     <span className="text-sm font-semibold text-slate-900">{selectedLease.bedroom}</span>
                                 </div>
-                                <div className="flex justify-between py-3 border-b border-slate-100">
-                                    <span className="text-sm font-medium text-slate-500">Tenant</span>
-                                    <span className="text-sm font-medium text-slate-900">{selectedLease.tenant}</span>
-                                </div>
+                                {selectedLease.companyName ? (
+                                    <>
+                                        <div className="flex justify-between py-3 border-b border-slate-100">
+                                            <span className="text-sm font-medium text-slate-500">Company (Lessee)</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-slate-900">{selectedLease.companyName}</span>
+                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100 uppercase">Company</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between py-3 border-b border-slate-100">
+                                            <span className="text-sm font-medium text-slate-500">Responsible Person</span>
+                                            <span className="text-sm font-medium text-slate-900">{selectedLease.responsiblePerson || selectedLease.primaryTenantName || selectedLease.tenant}</span>
+                                        </div>
+                                        {selectedLease.coTenants && selectedLease.coTenants.length > 0 && (
+                                            <div className="flex justify-between py-3 border-b border-slate-100">
+                                                <span className="text-sm font-medium text-slate-500">Co-Tenants</span>
+                                                <span className="text-sm font-medium text-slate-900">{selectedLease.coTenants.join(', ')}</span>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="flex justify-between py-3 border-b border-slate-100">
+                                        <span className="text-sm font-medium text-slate-500">Tenant</span>
+                                        <span className="text-sm font-medium text-slate-900">{selectedLease.tenant}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between py-3 border-b border-slate-100">
                                     <span className="text-sm font-medium text-slate-500">Term</span>
                                     <span className="text-sm font-medium text-slate-900">{selectedLease.term}</span>
@@ -505,9 +551,30 @@ export const LeaseHistory = () => {
                             </div>
 
                             <div className="space-y-4 mb-8">
+                                {Boolean(editLease.companyName || editLease.tenantType === 'COMPANY') && (
+                                    <div className="space-y-2 p-3 bg-purple-50/50 rounded-xl border border-purple-100">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-purple-900 uppercase tracking-wider">Company Legal Name (Lessee)</label>
+                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 uppercase">Company Lease</span>
+                                        </div>
+                                        <div className="relative">
+                                            <Building2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400" />
+                                            <input
+                                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-purple-200 bg-white outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all text-sm font-semibold text-slate-800"
+                                                value={editLease.companyName || ''}
+                                                onChange={(e) => setEditLease({ ...editLease, companyName: e.target.value })}
+                                                placeholder="Company Name"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-slate-700">First Name</label>
+                                        <label className="text-sm font-medium text-slate-700">
+                                            {Boolean(editLease.companyName || editLease.tenantType === 'COMPANY') ? 'Rep. First Name' : 'First Name'}
+                                        </label>
                                         <div className="relative">
                                             <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                             <input
@@ -519,7 +586,9 @@ export const LeaseHistory = () => {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-slate-700">Last Name</label>
+                                        <label className="text-sm font-medium text-slate-700">
+                                            {Boolean(editLease.companyName || editLease.tenantType === 'COMPANY') ? 'Rep. Last Name' : 'Last Name'}
+                                        </label>
                                         <div className="relative">
                                             <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                             <input
