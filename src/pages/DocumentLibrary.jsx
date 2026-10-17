@@ -20,7 +20,8 @@ import {
     ChevronLeft,
     ChevronRight,
     Edit,
-    Box
+    Box,
+    Home
 } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -37,6 +38,8 @@ export const DocumentLibrary = () => {
 
     const [typeFilter, setTypeFilter] = useState("All");
     const [propertyFilter, setPropertyFilter] = useState("All");
+    const [unitFilter, setUnitFilter] = useState("All");
+    const [tenantFilter, setTenantFilter] = useState("All");
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -196,6 +199,27 @@ export const DocumentLibrary = () => {
         fetchDropdownData();
     }, []);
 
+    const filteredUnitsList = useMemo(() => {
+        let list = dropdownData.units || [];
+        if (propertyFilter !== "All") {
+            list = list.filter(u => String(u.propertyId) === String(propertyFilter));
+        }
+        return [...list].sort((a, b) => {
+            const numA = a.unitNumber || a.name || '';
+            const numB = b.unitNumber || b.name || '';
+            return String(numA).localeCompare(String(numB), undefined, { numeric: true });
+        });
+    }, [dropdownData.units, propertyFilter]);
+
+    const sortedTenantsList = useMemo(() => {
+        const list = [...(dropdownData.tenants || [])];
+        return list.sort((a, b) => {
+            const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim().toLowerCase();
+            const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim().toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+    }, [dropdownData.tenants]);
+
     const filteredDocuments = documents.filter(doc => {
         const s = search.toLowerCase().trim();
         const matchesSearch = !s ||
@@ -214,8 +238,23 @@ export const DocumentLibrary = () => {
         const matchesProperty = propertyFilter === "All" ||
             String(doc.propertyId) === String(propertyFilter) ||
             String(doc.property?.id) === String(propertyFilter) ||
-            String(doc.unit?.propertyId) === String(propertyFilter);
-        
+            String(doc.unit?.propertyId) === String(propertyFilter) ||
+            String(doc.lease?.propertyId) === String(propertyFilter) ||
+            (doc.links && doc.links.some(l => l.entityType === 'PROPERTY' && String(l.entityId) === String(propertyFilter)));
+
+        const matchesUnit = unitFilter === "All" ||
+            String(doc.unitId) === String(unitFilter) ||
+            String(doc.unit?.id) === String(unitFilter) ||
+            String(doc.lease?.unitId) === String(unitFilter) ||
+            (doc.links && doc.links.some(l => l.entityType === 'UNIT' && String(l.entityId) === String(unitFilter)));
+
+        const matchesTenant = tenantFilter === "All" ||
+            String(doc.userId) === String(tenantFilter) ||
+            String(doc.user?.id) === String(tenantFilter) ||
+            String(doc.lease?.tenantId) === String(tenantFilter) ||
+            String(doc.lease?.tenant?.id) === String(tenantFilter) ||
+            (doc.links && doc.links.some(l => l.entityType === 'USER' && String(l.entityId) === String(tenantFilter)));
+
         const today = new Date().setHours(0,0,0,0);
         const isExpired = doc.expiryDate && new Date(doc.expiryDate) < today;
         let matchesExpiry = true;
@@ -223,7 +262,7 @@ export const DocumentLibrary = () => {
         else if (expiryFilter === "Active") matchesExpiry = !isExpired && doc.expiryDate;
         else if (expiryFilter === "No Expiry") matchesExpiry = !doc.expiryDate;
 
-        return matchesSearch && matchesType && matchesProperty && matchesExpiry;
+        return matchesSearch && matchesType && matchesProperty && matchesUnit && matchesTenant && matchesExpiry;
     });
 
     const sortedDocuments = useMemo(() => {
@@ -278,8 +317,8 @@ export const DocumentLibrary = () => {
                 </div>
 
                 {/* FILTERS */}
-                <Card className="p-6 rounded-[24px] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-center">
-                    <div className="flex-1 relative w-full">
+                <Card className="p-6 rounded-[24px] border border-slate-100 shadow-sm flex flex-col gap-4">
+                    <div className="relative w-full">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                             type="text"
@@ -289,12 +328,17 @@ export const DocumentLibrary = () => {
                             className="w-full pl-12 pr-5 py-3.5 rounded-[18px] border border-slate-200 outline-none focus:border-indigo-500 font-medium text-slate-700 bg-slate-50 focus:bg-white transition-all shadow-inner"
                         />
                     </div>
-                    <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-                        <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm">
+                    <div className="flex flex-wrap items-center gap-3 w-full">
+                        {/* Building Filter */}
+                        <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm hover:border-slate-300 transition-colors">
                             <Building size={16} className="text-slate-400 shrink-0" />
                             <select
                                 value={propertyFilter}
-                                onChange={(e) => { setPropertyFilter(e.target.value); setCurrentPage(1); }}
+                                onChange={(e) => { 
+                                    setPropertyFilter(e.target.value); 
+                                    setUnitFilter("All");
+                                    setCurrentPage(1); 
+                                }}
                                 className="outline-none bg-transparent cursor-pointer max-w-[150px] truncate"
                             >
                                 <option value="All">All Buildings</option>
@@ -305,7 +349,46 @@ export const DocumentLibrary = () => {
                                 ))}
                             </select>
                         </div>
-                        <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm">
+
+                        {/* Unit Filter */}
+                        <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm hover:border-slate-300 transition-colors">
+                            <Home size={16} className="text-slate-400 shrink-0" />
+                            <select
+                                value={unitFilter}
+                                onChange={(e) => { setUnitFilter(e.target.value); setCurrentPage(1); }}
+                                className="outline-none bg-transparent cursor-pointer max-w-[140px] truncate"
+                            >
+                                <option value="All">All Units</option>
+                                {filteredUnitsList.map(u => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.unitNumber ? `Unit ${u.unitNumber}` : (u.name || `Unit #${u.id}`)}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Tenant Filter */}
+                        <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm hover:border-slate-300 transition-colors">
+                            <User size={16} className="text-slate-400 shrink-0" />
+                            <select
+                                value={tenantFilter}
+                                onChange={(e) => { setTenantFilter(e.target.value); setCurrentPage(1); }}
+                                className="outline-none bg-transparent cursor-pointer max-w-[160px] truncate"
+                            >
+                                <option value="All">All Tenants</option>
+                                {sortedTenantsList.map(t => {
+                                    const name = `${t.firstName || ''} ${t.lastName || ''}`.trim() || t.name || t.email || `Tenant #${t.id}`;
+                                    return (
+                                        <option key={t.id} value={t.id}>
+                                            {name}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        </div>
+
+                        {/* Type Filter */}
+                        <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm hover:border-slate-300 transition-colors">
                             <Filter size={16} className="text-slate-400 shrink-0" />
                             <select
                                 value={typeFilter}
@@ -323,7 +406,9 @@ export const DocumentLibrary = () => {
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-                        <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm">
+
+                        {/* Expiry Filter */}
+                        <div className="flex items-center gap-2 px-4 py-3.5 rounded-[18px] border border-slate-200 bg-white font-bold text-slate-600 text-sm hover:border-slate-300 transition-colors">
                             <Clock size={16} className="text-slate-400 shrink-0" />
                             <select
                                 value={expiryFilter}
@@ -336,12 +421,16 @@ export const DocumentLibrary = () => {
                                 <option value="No Expiry">No Expiry Date</option>
                             </select>
                         </div>
+
+                        {/* Reset Button */}
                         <Button
                             variant="secondary"
-                            className="h-14 px-6 rounded-[18px]"
+                            className="h-12 px-6 rounded-[18px]"
                             onClick={() => {
                                 setSearch("");
                                 setPropertyFilter("All");
+                                setUnitFilter("All");
+                                setTenantFilter("All");
                                 setTypeFilter("All");
                                 setExpiryFilter("All");
                                 setCurrentPage(1);
