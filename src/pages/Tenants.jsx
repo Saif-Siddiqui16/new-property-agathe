@@ -76,7 +76,7 @@ export const Tenants = () => {
         propertyId: tenantBuildingFilter || ''
       });
       const res = await api.get(`/api/admin/tenants?${params.toString()}`);
-      
+
       if (res.data?.data) {
         setTenants(res.data.data);
         if (res.data.meta) {
@@ -93,11 +93,11 @@ export const Tenants = () => {
         const totalItems = dataArr.length;
         const totalPages = Math.ceil(totalItems / currentLimit) || 1;
         const currentPage = parseInt(page) || 1;
-        
+
         // Manual slice for non-paginated backend fallback
         const startIndex = (currentPage - 1) * currentLimit;
         const slicedData = dataArr.slice(startIndex, startIndex + currentLimit);
-        
+
         setTenants(slicedData);
         setPagination({
           page: currentPage,
@@ -318,7 +318,9 @@ export const Tenants = () => {
       state: getVal('state'),
       postalCode: getVal('postalCode'),
       country: getVal('country'),
-      companyContacts: tenantType === 'Company' ? companyContacts : [],
+      companyContacts: (tenantType === 'Company' || tenantType === 'COMPANY') 
+        ? companyContacts.filter(c => c.name && c.name.trim()) 
+        : [],
       residents: residents
     };
 
@@ -474,10 +476,10 @@ export const Tenants = () => {
   return (
     <>
       {viewingTenant ? (
-        <TenantDetail 
-          tenant={viewingTenant} 
-          onBack={handleBack} 
-          onSendInvite={handleSendInvite} 
+        <TenantDetail
+          tenant={viewingTenant}
+          onBack={handleBack}
+          onSendInvite={handleSendInvite}
           onEdit={() => handleEditTenant(viewingTenant)}
           allUnits={allUnits}
         />
@@ -592,13 +594,13 @@ export const Tenants = () => {
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                             : tenant.leaseStatus === 'Scheduled'
                               ? 'bg-blue-50 text-blue-700 border-blue-100'
-                            : tenant.leaseStatus === 'DRAFT'
-                              ? 'bg-amber-50 text-amber-700 border-amber-100'
-                              : 'bg-red-50 text-red-700 border-red-100'
+                              : tenant.leaseStatus === 'DRAFT'
+                                ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                : 'bg-red-50 text-red-700 border-red-100'
                             }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${tenant.leaseStatus === 'Active' ? 'bg-emerald-500' :
                               tenant.leaseStatus === 'Scheduled' ? 'bg-blue-500' :
-                              tenant.leaseStatus === 'DRAFT' ? 'bg-amber-500' : 'bg-red-500'
+                                tenant.leaseStatus === 'DRAFT' ? 'bg-amber-500' : 'bg-red-500'
                               }`}></span>
                             {tenant.leaseStatus === 'DRAFT' ? 'Draft' : tenant.leaseStatus}
                           </span>
@@ -612,7 +614,7 @@ export const Tenants = () => {
                           >
                             <Eye size={16} />
                           </button>
-                          
+
                           <AccessControl module="Tenant List" action="edit">
                             <button
                               onClick={() => handleEditTenant(tenant)}
@@ -680,13 +682,13 @@ export const Tenants = () => {
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                             : tenant.leaseStatus === 'Scheduled'
                               ? 'bg-blue-50 text-blue-700 border-blue-100'
-                            : tenant.leaseStatus === 'DRAFT'
-                              ? 'bg-amber-50 text-amber-700 border-amber-100'
-                              : 'bg-red-50 text-red-700 border-red-100'
+                              : tenant.leaseStatus === 'DRAFT'
+                                ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                : 'bg-red-50 text-red-700 border-red-100'
                             }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${tenant.leaseStatus === 'Active' ? 'bg-emerald-500' :
                               tenant.leaseStatus === 'Scheduled' ? 'bg-blue-500' :
-                              tenant.leaseStatus === 'DRAFT' ? 'bg-amber-500' : 'bg-red-500'
+                                tenant.leaseStatus === 'DRAFT' ? 'bg-amber-500' : 'bg-red-500'
                               }`}></span>
                             {tenant.leaseStatus === 'DRAFT' ? 'Draft' : tenant.leaseStatus}
                           </span>
@@ -715,7 +717,7 @@ export const Tenants = () => {
                             <Eye size={14} />
                             View
                           </button>
-                          
+
                           <AccessControl module="Tenant List" action="edit">
                             <button
                               onClick={() => handleEditTenant(tenant)}
@@ -1093,6 +1095,100 @@ export const Tenants = () => {
                           <input name="country" placeholder="Canada" defaultValue={editingTenant?.country || ''} className="px-5 py-3.5 rounded-2xl border border-slate-200 bg-white transition-all font-medium" />
                         </div>
                       </div>
+
+                      {/* Authorized Company Contacts */}
+                      <div className="pt-4 border-t border-purple-100">
+                        <div className="flex justify-between items-center mb-3">
+                          <div>
+                            <label className="text-xs font-bold text-purple-900 uppercase tracking-wider block">Authorized Company Contacts</label>
+                            <span className="text-[11px] text-slate-500 font-medium">Add representative contacts for billing or management</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setCompanyContacts(prev => [...prev, { name: '', email: '', phone: '', role: '' }])}
+                            className="text-xs font-bold text-purple-700 bg-purple-100/70 hover:bg-purple-100 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus size={14} /> Add Contact
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {companyContacts.map((contact, idx) => (
+                            <div key={idx} className="p-4 bg-white rounded-2xl border border-purple-100/80 shadow-xs space-y-3 relative">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Contact #{idx + 1}</span>
+                                {companyContacts.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setCompanyContacts(prev => prev.filter((_, i) => i !== idx))}
+                                    className="text-rose-500 hover:text-rose-700 text-xs font-bold transition-all p-1 cursor-pointer"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-xs font-medium text-slate-600 block mb-1">Name</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Contact Name"
+                                    value={contact.name || ''}
+                                    onChange={(e) => {
+                                      const updated = [...companyContacts];
+                                      updated[idx].name = e.target.value;
+                                      setCompanyContacts(updated);
+                                    }}
+                                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-medium focus:border-purple-500 outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs font-medium text-slate-600 block mb-1">Role / Designation</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Director, Manager"
+                                    value={contact.role || ''}
+                                    onChange={(e) => {
+                                      const updated = [...companyContacts];
+                                      updated[idx].role = e.target.value;
+                                      setCompanyContacts(updated);
+                                    }}
+                                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-medium focus:border-purple-500 outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs font-medium text-slate-600 block mb-1">Email</label>
+                                  <input
+                                    type="email"
+                                    placeholder="contact@company.com"
+                                    value={contact.email || ''}
+                                    onChange={(e) => {
+                                      const updated = [...companyContacts];
+                                      updated[idx].email = e.target.value;
+                                      setCompanyContacts(updated);
+                                    }}
+                                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-medium focus:border-purple-500 outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs font-medium text-slate-600 block mb-1">Phone</label>
+                                  <input
+                                    type="tel"
+                                    placeholder="(555) 000-0000"
+                                    value={contact.phone || ''}
+                                    onChange={(e) => {
+                                      const updated = [...companyContacts];
+                                      updated[idx].phone = e.target.value;
+                                      setCompanyContacts(updated);
+                                    }}
+                                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-medium focus:border-purple-500 outline-none"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -1251,7 +1347,7 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
   const [tempUnitList, setTempUnitList] = useState([]);
   const [tempBuildingList, setTempBuildingList] = useState([]);
   const [selectedTempUnitId, setSelectedTempUnitId] = useState('');
-  
+
   const handleAssignTempUnit = async (e) => {
     e.preventDefault();
     const form = e.target;
@@ -1276,19 +1372,19 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
   };
 
   const handleEndTempAssignment = async (lease) => {
-    if(!window.confirm('Are you sure you want to end this temporary assignment? The physical temporary unit will enter "Preparation" status for turnover.')) return;
+    if (!window.confirm('Are you sure you want to end this temporary assignment? The physical temporary unit will enter "Preparation" status for turnover.')) return;
     try {
       await api.post(`/api/admin/leases/${lease.id}/end-temporary-assignment`);
-      
-      if(window.confirm('Temporary assignment ended successfully. Would you like to schedule a Move-Out Inspection for the temporary unit now?')) {
-          navigate('/admin/workflow/inspections/new', {
-              state: {
-                  type: 'MOVE_OUT',
-                  unitId: lease.tempUnitId
-              }
-          });
+
+      if (window.confirm('Temporary assignment ended successfully. Would you like to schedule a Move-Out Inspection for the temporary unit now?')) {
+        navigate('/admin/workflow/inspections/new', {
+          state: {
+            type: 'MOVE_OUT',
+            unitId: lease.tempUnitId
+          }
+        });
       } else {
-          fetchTenantData();
+        fetchTenantData();
       }
     } catch (err) {
       console.error(err);
@@ -1297,7 +1393,7 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
   };
 
   useEffect(() => {
-    if(showTempUnitModal) {
+    if (showTempUnitModal) {
       api.get('/api/admin/properties').then(res => setTempBuildingList(res.data?.data || res.data || []));
     }
   }, [showTempUnitModal]);
@@ -1309,7 +1405,7 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
         try {
           const res = await api.get(`/api/admin/units?building_id=${tempBuildingId}&limit=100`);
           setTempUnitList(res.data?.data || res.data || []);
-        } catch(e) {}
+        } catch (e) { }
       } else {
         setTempUnitList([]);
       }
@@ -1893,8 +1989,8 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                           <td className="px-6 py-4">
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-tight ${lease.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                               lease.status === 'Scheduled' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                              lease.status === 'DRAFT' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                'bg-slate-50 text-slate-500 border-slate-100'
+                                lease.status === 'DRAFT' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                  'bg-slate-50 text-slate-500 border-slate-100'
                               }`}>
                               {lease.status}
                             </span>
@@ -2253,7 +2349,7 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                         {history.slice((historyPage - 1) * historyItemsPerPage, historyPage * historyItemsPerPage).map((item, index) => (
                           <div key={index} className="relative pl-6">
                             <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-2 border-indigo-500"></div>
-                            <div 
+                            <div
                               className="bg-slate-50 border border-slate-100 p-4 rounded-xl shadow-sm cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
                               onClick={() => setViewingHistoryItem(item)}
                             >
@@ -2434,9 +2530,9 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                           const documentId = viewingPolicy.uploadedDocumentId;
                           if (!documentId) return alert('No document record found for this policy');
 
-                           const endpoint = `/api/admin/documents/${documentId}/download?disposition=attachment`;
-                           const res = await api.get(endpoint, { responseType: 'blob' });
-                           const url = window.URL.createObjectURL(res.data);
+                          const endpoint = `/api/admin/documents/${documentId}/download?disposition=attachment`;
+                          const res = await api.get(endpoint, { responseType: 'blob' });
+                          const url = window.URL.createObjectURL(res.data);
                           const link = document.createElement('a');
                           link.href = url;
                           link.setAttribute('download', `insurance-${viewingPolicy.id}.pdf`);
@@ -2786,12 +2882,12 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                 </button>
               </div>
               <form onSubmit={handleAssignTempUnit} className="p-6 space-y-4">
-                
+
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Temporary Building</label>
-                  <select 
-                    name="tempBuildingId" 
-                    required 
+                  <select
+                    name="tempBuildingId"
+                    required
                     value={tempBuildingId}
                     onChange={(e) => setTempBuildingId(e.target.value)}
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm"
@@ -2805,9 +2901,9 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
 
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Temporary Unit</label>
-                  <select 
-                    name="tempUnitId" 
-                    required 
+                  <select
+                    name="tempUnitId"
+                    required
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm"
                   >
                     <option value="">Select Unit...</option>
@@ -2820,28 +2916,28 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Start Date</label>
-                    <input 
-                      type="date" 
-                      name="startDate" 
-                      required 
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700" 
+                    <input
+                      type="date"
+                      name="startDate"
+                      required
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Expected End Date</label>
-                    <input 
-                      type="date" 
-                      name="endDate" 
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700" 
+                    <input
+                      type="date"
+                      name="endDate"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700"
                     />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Reason</label>
-                  <select 
-                    name="reason" 
-                    required 
+                  <select
+                    name="reason"
+                    required
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700"
                   >
                     <option value="Repairs/Maintenance">Repairs/Maintenance</option>
@@ -2857,12 +2953,12 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                     Temporary Accommodation Variance ($)
                     <span className="text-xs text-slate-400 font-normal ml-2">(Optional)</span>
                   </label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="0.01"
-                    name="variance" 
+                    name="variance"
                     placeholder="0.00"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700" 
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm text-slate-700"
                   />
                   <p className="text-[10px] text-slate-500 mt-1">For management reporting only. Does not affect rent or accounting.</p>
                 </div>
@@ -2904,8 +3000,8 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
 
               <div className="flex gap-3 mt-8">
                 {viewingHistoryItem.linkType === 'Document' && (
-                  <Button 
-                    variant="primary" 
+                  <Button
+                    variant="primary"
                     className="flex-1 gap-2"
                     onClick={async () => {
                       try {
@@ -2923,8 +3019,8 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                   </Button>
                 )}
                 {viewingHistoryItem.linkType === 'Lease' && (
-                  <Button 
-                    variant="primary" 
+                  <Button
+                    variant="primary"
                     className="flex-1 gap-2"
                     onClick={async () => {
                       try {
@@ -2944,8 +3040,8 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                   </Button>
                 )}
                 {viewingHistoryItem.linkType === 'Inspection' && (
-                  <Button 
-                    variant="primary" 
+                  <Button
+                    variant="primary"
                     className="flex-1 gap-2"
                     onClick={() => {
                       window.location.href = `/admin/workflow/inspections/${viewingHistoryItem.linkId}`;
@@ -2955,8 +3051,8 @@ const TenantDetail = ({ tenant, onBack, onSendInvite, onEdit, allUnits = [] }) =
                   </Button>
                 )}
                 {viewingHistoryItem.linkType === 'Ticket' && (
-                  <Button 
-                    variant="primary" 
+                  <Button
+                    variant="primary"
                     className="flex-1 gap-2"
                     onClick={() => {
                       window.location.href = '/tickets';

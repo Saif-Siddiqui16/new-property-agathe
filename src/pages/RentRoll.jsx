@@ -111,7 +111,7 @@ export const RentRoll = () => {
     };
 
     const handleExportCSV = () => {
-        const headers = ["Building Name", "Lease Type", "Unit Number", "Bedroom Number", "Tenant Name", "Lease Start Date", "Lease End Date", "Days to Expiry", "Monthly Rent", "Potential Rent", "Vacancy Loss", "Outstanding Rent", "Outstanding Deposit", "Status"];
+        const headers = ["Building Name", "Lease Type", "Unit Number", "Bedroom Number", "Tenant Name", "Lease Start Date", "Lease End Date", "Days to Expiry", "Gross Rent", "Promotional Discount", "Net Monthly Rent", "Potential Rent", "Vacancy Loss", "Outstanding Rent", "Outstanding Deposit", "Status"];
         const rows = filteredRentRoll.map(row => {
             const expiryInfo = formatDaysRemaining(row.endDate);
             return [
@@ -123,7 +123,9 @@ export const RentRoll = () => {
                 row.startDate ? new Date(row.startDate).toLocaleDateString() : 'N/A',
                 row.endDate ? new Date(row.endDate).toLocaleDateString() : 'N/A',
                 expiryInfo.text,
-                row.monthlyRent || 0,
+                row.grossRent || row.monthlyRent || 0,
+                row.promotionalDiscount || 0,
+                row.netRent || row.monthlyRent || 0,
                 row.potentialRent || 0,
                 row.vacancyLoss || 0,
                 row.outstandingRent || 0,
@@ -426,7 +428,16 @@ export const RentRoll = () => {
                                              <td className="px-3 py-4 font-black text-slate-800">
                                                  <div className="flex flex-col">
                                                      {row.status !== 'Vacant' ? (
-                                                         <span>${parseFloat(row.monthlyRent || 0).toLocaleString()}</span>
+                                                         row.promotionalDiscount > 0 ? (
+                                                             <div>
+                                                                 <span className="text-slate-900 font-black">${parseFloat(row.netRent ?? row.monthlyRent).toLocaleString()}</span>
+                                                                 <div className="text-[10px] text-emerald-600 font-semibold tracking-tight">
+                                                                     Gross: ${parseFloat(row.grossRent || row.monthlyRent).toLocaleString()} (-${parseFloat(row.promotionalDiscount).toLocaleString()})
+                                                                 </div>
+                                                             </div>
+                                                         ) : (
+                                                             <span>${parseFloat(row.monthlyRent || 0).toLocaleString()}</span>
+                                                         )
                                                      ) : (
                                                          <span className="text-slate-600 font-bold">${parseFloat(row.potentialRent || 0).toLocaleString()}</span>
                                                      )}

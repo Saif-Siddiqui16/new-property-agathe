@@ -764,23 +764,54 @@ export const Invoices = () => {
                                             <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Amount</span>
                                         </div>
                                         <div className="space-y-0.5">
-                                            <div className="px-6 py-4 flex items-center justify-between border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                                <div>
-                                                    <p className="font-bold text-slate-800">Monthly Rent Payment</p>
-                                                    <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Period: {viewInvoice.month}</p>
-                                                </div>
-                                                <span className="font-bold text-slate-700 font-mono italic">$ {(viewInvoice.rent || 0).toLocaleString('en-CA')}</span>
-                                            </div>
-                                            {viewInvoice.category === 'SERVICE' && viewInvoice.items && viewInvoice.items.length > 0 ? (
-                                                viewInvoice.items.map((item, idx) => (
-                                                    <div key={idx} className="px-6 py-4 flex items-center justify-between border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                            {viewInvoice.discountAmount > 0 ? (
+                                                <>
+                                                    {/* Contractual Base Rent */}
+                                                    <div className="px-6 py-4 flex items-center justify-between border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                                                         <div>
-                                                            <p className="font-bold text-slate-800">{item.description}</p>
-                                                            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Service Item</p>
+                                                            <p className="font-bold text-slate-800">Monthly Rent</p>
+                                                            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Period: {viewInvoice.month} · Contractual Base Rent</p>
                                                         </div>
-                                                        <span className="font-bold text-slate-700 font-mono italic">$ {(parseFloat(item.amount) || 0).toLocaleString('en-CA')}</span>
+                                                        <span className="font-bold text-slate-700 font-mono italic">
+                                                            $ {(viewInvoice.grossRent || (viewInvoice.rent + viewInvoice.discountAmount)).toLocaleString('en-CA')}
+                                                        </span>
                                                     </div>
-                                                ))
+
+                                                    {/* Promotional Discount Line Item */}
+                                                    <div className="px-6 py-4 flex items-center justify-between border-b border-emerald-50 bg-emerald-50/30 hover:bg-emerald-50/50 transition-colors">
+                                                        <div>
+                                                            <p className="font-bold text-emerald-800 flex items-center gap-1.5">
+                                                                <span>Promotional Rent Discount</span>
+                                                            </p>
+                                                            <p className="text-[11px] text-emerald-600 font-medium uppercase tracking-widest mt-0.5">Special Promotional Offer Applied</p>
+                                                        </div>
+                                                        <span className="font-bold text-emerald-600 font-mono italic">
+                                                            -$ {viewInvoice.discountAmount.toLocaleString('en-CA')}
+                                                        </span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="px-6 py-4 flex items-center justify-between border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                                    <div>
+                                                        <p className="font-bold text-slate-800">Monthly Rent Payment</p>
+                                                        <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Period: {viewInvoice.month}</p>
+                                                    </div>
+                                                    <span className="font-bold text-slate-700 font-mono italic">$ {(viewInvoice.rent || 0).toLocaleString('en-CA')}</span>
+                                                </div>
+                                            )}
+
+                                            {viewInvoice.category === 'SERVICE' && viewInvoice.items && viewInvoice.items.length > 0 ? (
+                                                viewInvoice.items
+                                                    .filter(item => !item.description?.toLowerCase().includes('promotional discount'))
+                                                    .map((item, idx) => (
+                                                        <div key={idx} className="px-6 py-4 flex items-center justify-between border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                                            <div>
+                                                                <p className="font-bold text-slate-800">{item.description}</p>
+                                                                <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Service Item</p>
+                                                            </div>
+                                                            <span className="font-bold text-slate-700 font-mono italic">$ {(parseFloat(item.amount) || 0).toLocaleString('en-CA')}</span>
+                                                        </div>
+                                                    ))
                                             ) : (viewInvoice.serviceFees || 0) > 0 && (
                                                 <div className="px-6 py-4 flex items-center justify-between border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                                                     <div>
@@ -795,17 +826,36 @@ export const Invoices = () => {
 
                                     <div className="flex justify-end pt-4">
                                         <div className="w-64 space-y-3">
-                                            <div className="flex justify-between items-center text-sm px-2">
-                                                <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Subtotal</span>
-                                                <span className="font-bold text-slate-600 font-mono italic">$ {(viewInvoice.amount || 0).toLocaleString('en-CA')}</span>
-                                            </div>
+                                            {viewInvoice.discountAmount > 0 ? (
+                                                <>
+                                                    <div className="flex justify-between items-center text-sm px-2">
+                                                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Monthly Rent</span>
+                                                        <span className="font-bold text-slate-600 font-mono italic">$ {(viewInvoice.grossRent || (viewInvoice.rent + viewInvoice.discountAmount)).toLocaleString('en-CA')}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-sm px-2">
+                                                        <span className="text-emerald-600 font-bold uppercase tracking-widest text-[10px]">Promo Discount</span>
+                                                        <span className="font-bold text-emerald-600 font-mono italic">-$ {(viewInvoice.discountAmount || 0).toLocaleString('en-CA')}</span>
+                                                    </div>
+                                                    {(viewInvoice.serviceFees || 0) > 0 && (
+                                                        <div className="flex justify-between items-center text-sm px-2">
+                                                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Service Fees</span>
+                                                            <span className="font-bold text-slate-600 font-mono italic">$ {(viewInvoice.serviceFees || 0).toLocaleString('en-CA')}</span>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div className="flex justify-between items-center text-sm px-2">
+                                                    <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Subtotal</span>
+                                                    <span className="font-bold text-slate-600 font-mono italic">$ {(viewInvoice.amount || 0).toLocaleString('en-CA')}</span>
+                                                </div>
+                                            )}
                                             <div className="flex justify-between items-center text-sm px-2">
                                                 <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Taxes (0%)</span>
                                                 <span className="font-bold text-slate-600 font-mono italic">$ 0</span>
                                             </div>
                                             <div className="bg-indigo-600 rounded-2xl p-6 shadow-xl shadow-indigo-100 flex justify-between items-center text-white mt-4 relative overflow-hidden group">
                                                 <div className="relative z-10">
-                                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Due</p>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Rent Due</p>
                                                     <p className="text-2xl font-black tracking-tight mt-1 italic">$ {(viewInvoice.amount || 0).toLocaleString('en-CA')}</p>
                                                 </div>
                                                 <div className="absolute right-[-10%] top-[-20%] w-24 h-24 bg-white/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>

@@ -3,7 +3,7 @@ import { MainLayout } from '../layouts/MainLayout';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { Button } from '../components/Button';
-import { BedDouble, Calendar, DollarSign, Home, User, Shield, ChevronDown, CheckCircle, Bed, Lock, Plus, X } from 'lucide-react';
+import { BedDouble, Calendar, DollarSign, Home, User, Shield, ChevronDown, CheckCircle, Bed, Lock, Plus, X, Tag, Sparkles } from 'lucide-react';
 
 export const LeaseFormBedroom = () => {
     const navigate = useNavigate();
@@ -25,6 +25,29 @@ export const LeaseFormBedroom = () => {
         sendCredentials: false,
         lockers: []
     });
+
+    const [promo, setPromo] = useState({
+        applyPromotion: false,
+        promoType: 'ONE_MONTH_FREE', // 'ONE_MONTH_FREE' | 'TWO_MONTHS_FREE' | 'CUSTOM_AMOUNT'
+        distributionMethod: 'FIRST_MONTH', // 'FIRST_MONTH' | 'DISTRIBUTED'
+        customDiscountAmount: ''
+    });
+
+    // Timezone-safe date parser: parses at local noon to prevent UTC midnight shifts in Canadian timezones
+    const safeDate = (dateStr) => {
+        if (!dateStr) return null;
+        const datePart = String(dateStr).substring(0, 10);
+        return new Date(datePart + 'T12:00:00');
+    };
+
+    const calculateDurationMonths = (start, end) => {
+        if (!start || !end) return 12;
+        const s = safeDate(start);
+        const e = safeDate(end);
+        if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return 12;
+        let months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1;
+        return months > 0 ? months : 12;
+    };
 
     const [availableLockers, setAvailableLockers] = useState([]);
 
@@ -176,16 +199,36 @@ export const LeaseFormBedroom = () => {
         }
 
         try {
+            const baseRent = parseFloat(form.monthlyRent) || 0;
+            const durationMonths = calculateDurationMonths(form.startDate, form.endDate);
+            let totalDiscount = 0;
+            if (promo.promoType === 'ONE_MONTH_FREE') totalDiscount = baseRent;
+            else if (promo.promoType === 'TWO_MONTHS_FREE') totalDiscount = baseRent * 2;
+            else if (promo.promoType === 'CUSTOM_AMOUNT') totalDiscount = parseFloat(promo.customDiscountAmount) || 0;
+
+            let monthlyDiscount = 0;
+            if (promo.distributionMethod === 'DISTRIBUTED') {
+                monthlyDiscount = durationMonths > 0 ? parseFloat((totalDiscount / durationMonths).toFixed(2)) : 0;
+            } else {
+                monthlyDiscount = totalDiscount;
+            }
+
             const payload = {
                 ...form,
                 unitId: parseInt(form.unitId),
                 bedroomId: parseInt(form.bedroomId),
                 tenantId: parseInt(form.tenantId),
                 coTenantIds: form.coTenantIds.map(id => parseInt(id)),
-                monthlyRent: parseFloat(form.monthlyRent) || 0,
+                monthlyRent: baseRent,
                 securityDeposit: parseFloat(form.securityDeposit) || 0,
                 isFullUnitLease: false,
                 sendCredentials: form.sendCredentials, // Explicitly send flag
+                hasPromotion: promo.applyPromotion,
+                promoType: promo.applyPromotion ? promo.promoType : null,
+                promoDistribution: promo.applyPromotion ? promo.distributionMethod : null,
+                promoTotalDiscount: promo.applyPromotion ? totalDiscount : 0,
+                promoMonthlyDiscount: promo.applyPromotion ? monthlyDiscount : 0,
+                promoDurationMonths: promo.applyPromotion ? (promo.distributionMethod === 'DISTRIBUTED' ? durationMonths : (promo.promoType === 'TWO_MONTHS_FREE' ? 2 : 1)) : 0,
                 lockers: form.lockers.filter(l => l.lockerId && l.startDate && l.endDate && l.rentAmount).map(l => ({
                     lockerId: parseInt(l.lockerId),
                     rentAmount: parseFloat(l.rentAmount),
@@ -218,6 +261,27 @@ export const LeaseFormBedroom = () => {
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
     };
+
+    const baseMonthlyRent = parseFloat(form.monthlyRent) || 0;
+    const leaseDurationMonths = calculateDurationMonths(form.startDate, form.endDate);
+
+    let calculatedTotalDiscount = 0;
+    if (promo.promoType === 'ONE_MONTH_FREE') {
+        calculatedTotalDiscount = baseMonthlyRent;
+    } else if (promo.promoType === 'TWO_MONTHS_FREE') {
+        calculatedTotalDiscount = baseMonthlyRent * 2;
+    } else if (promo.promoType === 'CUSTOM_AMOUNT') {
+        calculatedTotalDiscount = parseFloat(promo.customDiscountAmount) || 0;
+    }
+
+    let calculatedMonthlyDiscount = 0;
+    if (promo.distributionMethod === 'DISTRIBUTED') {
+        calculatedMonthlyDiscount = leaseDurationMonths > 0 ? parseFloat((calculatedTotalDiscount / leaseDurationMonths).toFixed(2)) : 0;
+    } else {
+        calculatedMonthlyDiscount = calculatedTotalDiscount;
+    }
+
+    const netRentDuePreview = Math.max(0, baseMonthlyRent - calculatedMonthlyDiscount);
 
     return (
         <MainLayout title="Bedroom Lease">
@@ -444,6 +508,203 @@ export const LeaseFormBedroom = () => {
                                 />
                             </div>
                         </div>
+                    </div>
+
+                    {/* Promotional Rent Discount Section */}
+                    <div className="mt-8 border-t border-slate-100 pt-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                    <Tag size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800 m-0">Apply Promotional Discount? (Optional)</h3>
+                                    <p className="text-xs text-slate-500 m-0">Offer promotional rent discounts like 1 month free or custom discounts.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center bg-slate-100 p-1 rounded-xl">
+                                <button
+                                    type="button"
+                                    onClick={() => setPromo(prev => ({ ...prev, applyPromotion: false }))}
+                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                        !promo.applyPromotion
+                                            ? 'bg-white text-slate-700 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    No
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPromo(prev => ({ ...prev, applyPromotion: true }))}
+                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                        promo.applyPromotion
+                                            ? 'bg-emerald-600 text-white shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    Yes
+                                </button>
+                            </div>
+                        </div>
+
+                        {promo.applyPromotion && (
+                            <div className="bg-emerald-50/50 rounded-2xl p-5 border border-emerald-100 space-y-5 animate-in fade-in duration-300">
+                                {/* Promotion Type */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                                        Select Promotion Offer
+                                    </label>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPromo(prev => ({ ...prev, promoType: 'ONE_MONTH_FREE' }))}
+                                            className={`p-3 rounded-xl border text-left transition-all ${
+                                                promo.promoType === 'ONE_MONTH_FREE'
+                                                    ? 'border-emerald-500 bg-white ring-2 ring-emerald-500/20 shadow-sm'
+                                                    : 'border-slate-200 bg-white/70 hover:bg-white'
+                                            }`}
+                                        >
+                                            <div className="text-sm font-bold text-slate-800">1 Month Free</div>
+                                            <div className="text-xs text-slate-500 mt-0.5">Value: ${baseMonthlyRent.toLocaleString('en-CA')}</div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setPromo(prev => ({ ...prev, promoType: 'TWO_MONTHS_FREE' }))}
+                                            className={`p-3 rounded-xl border text-left transition-all ${
+                                                promo.promoType === 'TWO_MONTHS_FREE'
+                                                    ? 'border-emerald-500 bg-white ring-2 ring-emerald-500/20 shadow-sm'
+                                                    : 'border-slate-200 bg-white/70 hover:bg-white'
+                                            }`}
+                                        >
+                                            <div className="text-sm font-bold text-slate-800">2 Months Free</div>
+                                            <div className="text-xs text-slate-500 mt-0.5">Value: ${(baseMonthlyRent * 2).toLocaleString('en-CA')}</div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setPromo(prev => ({ ...prev, promoType: 'CUSTOM_AMOUNT' }))}
+                                            className={`p-3 rounded-xl border text-left transition-all ${
+                                                promo.promoType === 'CUSTOM_AMOUNT'
+                                                    ? 'border-emerald-500 bg-white ring-2 ring-emerald-500/20 shadow-sm'
+                                                    : 'border-slate-200 bg-white/70 hover:bg-white'
+                                            }`}
+                                        >
+                                            <div className="text-sm font-bold text-slate-800">Custom Amount ($)</div>
+                                            <div className="text-xs text-slate-500 mt-0.5">Set custom discount</div>
+                                        </button>
+                                    </div>
+
+                                    {promo.promoType === 'CUSTOM_AMOUNT' && (
+                                        <div className="mt-3">
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">
+                                                Custom Discount Value ($)
+                                            </label>
+                                            <div className="relative max-w-xs">
+                                                <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                <input
+                                                    type="number"
+                                                    placeholder="0.00"
+                                                    value={promo.customDiscountAmount}
+                                                    onChange={(e) => setPromo(prev => ({ ...prev, customDiscountAmount: e.target.value }))}
+                                                    className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-semibold"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Distribution Method */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                                        Discount Distribution Method
+                                    </label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPromo(prev => ({ ...prev, distributionMethod: 'FIRST_MONTH' }))}
+                                            className={`p-3.5 rounded-xl border text-left transition-all ${
+                                                promo.distributionMethod === 'FIRST_MONTH'
+                                                    ? 'border-emerald-500 bg-white ring-2 ring-emerald-500/20 shadow-sm'
+                                                    : 'border-slate-200 bg-white/70 hover:bg-white'
+                                            }`}
+                                        >
+                                            <div className="text-sm font-bold text-slate-800">Option 1 – Free Rent Applied to First Month</div>
+                                            <div className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                                First month rent invoice will be $0.00. Normal rent resumes for the remaining months.
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setPromo(prev => ({ ...prev, distributionMethod: 'DISTRIBUTED' }))}
+                                            className={`p-3.5 rounded-xl border text-left transition-all ${
+                                                promo.distributionMethod === 'DISTRIBUTED'
+                                                    ? 'border-emerald-500 bg-white ring-2 ring-emerald-500/20 shadow-sm'
+                                                    : 'border-slate-200 bg-white/70 hover:bg-white'
+                                            }`}
+                                        >
+                                            <div className="text-sm font-bold text-slate-800">Option 2 – Distributed Over Lease Term</div>
+                                            <div className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                                Discount is divided evenly across all {leaseDurationMonths} months.
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Live Preview Summary Card */}
+                                <div className="bg-white rounded-xl p-4 border border-emerald-200 shadow-sm">
+                                    <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-700 mb-3">
+                                        <Sparkles size={14} />
+                                        Promotional Calculation Preview
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs border-b border-slate-100 pb-3 mb-3">
+                                        <div>
+                                            <span className="text-slate-400 block font-medium">Contractual Monthly Rent</span>
+                                            <span className="font-bold text-slate-800 text-sm">${baseMonthlyRent.toLocaleString('en-CA')}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-400 block font-medium">Total Discount Value</span>
+                                            <span className="font-bold text-slate-800 text-sm">${calculatedTotalDiscount.toLocaleString('en-CA')}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-400 block font-medium">Distribution Method</span>
+                                            <span className="font-semibold text-slate-800">
+                                                {promo.distributionMethod === 'FIRST_MONTH' ? 'Upfront (First Month)' : `Distributed (${leaseDurationMonths} mos)`}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-400 block font-medium">Monthly Discount</span>
+                                            <span className="font-bold text-emerald-600 text-sm">
+                                                {promo.distributionMethod === 'DISTRIBUTED'
+                                                    ? `-$${calculatedMonthlyDiscount.toLocaleString('en-CA')}/mo`
+                                                    : `-$${calculatedTotalDiscount.toLocaleString('en-CA')} (Month 1)`}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between pt-1">
+                                        <div>
+                                            <span className="text-[11px] font-semibold text-slate-500 block">Monthly Rent Due</span>
+                                            <span className="text-sm font-extrabold text-emerald-700">
+                                                {promo.distributionMethod === 'DISTRIBUTED' ? (
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="line-through text-slate-400 font-normal text-xs">${baseMonthlyRent.toLocaleString('en-CA')}</span>
+                                                        <span>${netRentDuePreview.toLocaleString('en-CA')} / month</span>
+                                                    </span>
+                                                ) : (
+                                                    <span>Month 1: $0.00 · Remaining {Math.max(0, leaseDurationMonths - (promo.promoType === 'TWO_MONTHS_FREE' ? 2 : 1))} Months: ${baseMonthlyRent.toLocaleString('en-CA')}/mo</span>
+                                                )}
+                                            </span>
+                                        </div>
+                                        <span className="text-[10px] font-bold px-2 py-1 rounded bg-emerald-100 text-emerald-800 uppercase tracking-wide">
+                                            Base rent preserved
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Lockers Section */}

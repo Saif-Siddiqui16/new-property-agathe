@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Trash2, X, FileText, Calendar, User, Home, Bed, AlertTriangle, CheckCircle, Search, ChevronLeft, ChevronRight, Plus, Lock, Building2 } from 'lucide-react';
+import { Eye, Pencil, Trash2, X, FileText, Calendar, User, Home, Bed, AlertTriangle, CheckCircle, Search, ChevronLeft, ChevronRight, ChevronDown, Shield, Plus, Lock, Building2, Tag, Sparkles } from 'lucide-react';
 import { Button } from '../components/Button';
 import api from '../api/client';
 import { hasPermission } from '../utils/permissions';
@@ -20,6 +20,9 @@ export const LeaseHistory = () => {
     const [selectedLease, setSelectedLease] = useState(null);
     const [editLease, setEditLease] = useState(null);
     const [buildings, setBuildings] = useState([]);
+    const [tenants, setTenants] = useState([]);
+    const [editUnits, setEditUnits] = useState([]);
+    const [editBedrooms, setEditBedrooms] = useState([]);
     const [search, setSearch] = useState('');
     const [buildingFilter, setBuildingFilter] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
@@ -79,12 +82,22 @@ export const LeaseHistory = () => {
         const fetchBuildings = async () => {
             try {
                 const res = await api.get('/api/admin/properties');
-                setBuildings(res.data);
+                setBuildings(res.data?.data || res.data || []);
             } catch (error) {
                 console.error('Failed to fetch buildings', error);
             }
         };
         fetchBuildings();
+
+        const fetchTenants = async () => {
+            try {
+                const res = await api.get('/api/admin/tenants?limit=1000');
+                setTenants(res.data?.data || res.data || []);
+            } catch (error) {
+                console.error('Failed to fetch tenants', error);
+            }
+        };
+        fetchTenants();
 
         // Fetch all available lockers for the dropdown
         const fetchLockers = async () => {
@@ -122,6 +135,87 @@ export const LeaseHistory = () => {
         }
     };
 
+    // Timezone-safe date parser: parses at local noon to prevent UTC midnight shifts in Canadian timezones
+    const safeDate = (dateStr) => {
+        if (!dateStr) return null;
+        const datePart = String(dateStr).substring(0, 10);
+        return new Date(datePart + 'T12:00:00');
+    };
+
+    const calculateDurationMonths = (start, end) => {
+        if (!start || !end) return 12;
+        const s = safeDate(start);
+        const e = safeDate(end);
+        if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime())) return 12;
+        let months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1;
+        return months > 0 ? months : 12;
+    };
+
+    const fetchUnitsForEdit = async (propId) => {
+        if (!propId) {
+            setEditUnits([]);
+            return;
+        }
+        try {
+            const unitsRes = await api.get(`/api/admin/units?propertyId=${propId}&limit=1000&showInactive=true`);
+            const allUnits = Array.isArray(unitsRes.data?.data) ? unitsRes.data.data : (Array.isArray(unitsRes.data) ? unitsRes.data : []);
+            setEditUnits(allUnits);
+        } catch (e) {
+            console.error('Failed to fetch units for edit', e);
+            setEditUnits([]);
+        }
+    };
+
+    const fetchBedroomsForEdit = async (unitId) => {
+        if (!unitId) {
+            setEditBedrooms([]);
+            return;
+        }
+        try {
+            const bedroomRes = await api.get(`/api/admin/units/bedrooms/vacant?unitId=${unitId}`);
+            setEditBedrooms(Array.isArray(bedroomRes.data) ? bedroomRes.data : []);
+        } catch (e) {
+            console.error('Failed to fetch bedrooms for edit', e);
+            setEditBedrooms([]);
+        }
+    };
+
+    const handleEditBuildingChange = (e) => {
+        const propId = e.target.value;
+        setEditLease(prev => ({
+            ...prev,
+            propertyId: propId,
+            unitId: '',
+            bedroomId: ''
+        }));
+        fetchUnitsForEdit(propId);
+        setEditBedrooms([]);
+    };
+
+    const handleEditUnitChange = (e) => {
+        const uId = e.target.value;
+        setEditLease(prev => ({
+            ...prev,
+            unitId: uId,
+            bedroomId: ''
+        }));
+        fetchBedroomsForEdit(uId);
+    };
+
+    const handleEditTenantChange = (e) => {
+        const tId = e.target.value;
+        const selectedTenant = tenants.find(t => t.id.toString() === tId);
+        setEditLease(prev => ({
+            ...prev,
+            tenantId: tId,
+            tenantFirstName: selectedTenant?.firstName || prev.tenantFirstName,
+            tenantLastName: selectedTenant?.lastName || prev.tenantLastName,
+            companyName: (selectedTenant?.type === 'COMPANY' || selectedTenant?.type === 'Company') ? (selectedTenant.companyName || selectedTenant.name) : prev.companyName,
+            tenantType: selectedTenant?.type || prev.tenantType,
+            coTenantIds: (prev.coTenantIds || []).filter(cid => cid.toString() !== tId)
+        }));
+    };
+
     /* SAVE EDIT */
     const handleEditSave = async (e) => {
         if ((editLease.tenantType === 'COMPANY' || editLease.companyName) && !editLease.companyName?.trim()) {
@@ -136,6 +230,52 @@ export const LeaseHistory = () => {
 
         e?.preventDefault();
         try {
+            let promoPayload = {
+                hasPromotion: false,
+                promoType: null,
+                promoDistribution: null,
+                promoTotalDiscount: 0,
+                promoMonthlyDiscount: 0,
+                promoDurationMonths: 0
+            };
+
+            if (editLease.hasPromotion) {
+                const baseRent = parseFloat(editLease.monthlyRent) || 0;
+                const totalLeaseMonths = calculateDurationMonths(editLease.startDate, editLease.endDate);
+                
+                // GUARDRAIL: When lease is extended, lock duration to the initial promotional term
+                const origDuration = parseInt(editLease.originalPromoDurationMonths) || 0;
+                const durationMonths = (origDuration > 0 && totalLeaseMonths > origDuration) ? origDuration : totalLeaseMonths;
+
+                let totalDiscount = 0;
+                if (editLease.promoType === 'ONE_MONTH_FREE') totalDiscount = baseRent;
+                else if (editLease.promoType === 'TWO_MONTHS_FREE') totalDiscount = baseRent * 2;
+                else if (editLease.promoType === 'CUSTOM_AMOUNT') totalDiscount = parseFloat(editLease.promoTotalDiscount) || 0;
+
+                let monthlyDiscount = 0;
+                if (editLease.promoDistribution === 'DISTRIBUTED') {
+                    monthlyDiscount = durationMonths > 0 ? parseFloat((totalDiscount / durationMonths).toFixed(2)) : 0;
+                } else {
+                    monthlyDiscount = totalDiscount;
+                }
+
+                // If lease is extended, preserve the original promoEndDate cutoff
+                const promoEndDate = (origDuration > 0 && totalLeaseMonths > origDuration && editLease.promoEndDate) 
+                    ? editLease.promoEndDate 
+                    : editLease.endDate;
+
+                promoPayload = {
+                    hasPromotion: true,
+                    promoType: editLease.promoType,
+                    promoDistribution: editLease.promoDistribution,
+                    promoTotalDiscount: totalDiscount,
+                    promoMonthlyDiscount: monthlyDiscount,
+                    promoDurationMonths: editLease.promoDistribution === 'DISTRIBUTED' ? durationMonths : (editLease.promoType === 'TWO_MONTHS_FREE' ? 2 : 1),
+                    promoStartDate: editLease.promoStartDate || editLease.startDate,
+                    promoEndDate: promoEndDate
+                };
+            }
+
             const payload = {
                 monthlyRent: editLease.monthlyRent,
                 startDate: editLease.startDate,
@@ -143,6 +283,12 @@ export const LeaseHistory = () => {
                 firstName: editLease.tenantFirstName,
                 lastName: editLease.tenantLastName,
                 companyName: editLease.companyName,
+                tenantId: editLease.tenantId ? parseInt(editLease.tenantId) : undefined,
+                unitId: editLease.unitId ? parseInt(editLease.unitId) : undefined,
+                bedroomId: editLease.bedroomId ? parseInt(editLease.bedroomId) : null,
+                securityDeposit: editLease.securityDeposit ? parseFloat(editLease.securityDeposit) : 0,
+                coTenantIds: (editLease.coTenantIds || []).map(id => parseInt(id)).filter(id => !isNaN(id)),
+                ...promoPayload,
                 lockers: [
                     // Existing locker edits (end date changes)
                     ...leaseLockers
@@ -168,9 +314,45 @@ export const LeaseHistory = () => {
     };
 
     const openEditWithLockers = async (lease) => {
-        setEditLease({ ...lease });
+        const pId = lease.propertyId ? lease.propertyId.toString() : '';
+        const uId = lease.unitId ? lease.unitId.toString() : '';
+        const bId = lease.bedroomId ? lease.bedroomId.toString() : '';
+        const tId = lease.tenantId ? lease.tenantId.toString() : '';
+        const coIds = Array.isArray(lease.coTenantIds) ? lease.coTenantIds.map(id => id.toString()) : [];
+
+        setEditLease({
+            ...lease,
+            propertyId: pId,
+            unitId: uId,
+            bedroomId: bId,
+            tenantId: tId,
+            coTenantIds: coIds,
+            securityDeposit: lease.securityDeposit !== undefined && lease.securityDeposit !== null ? lease.securityDeposit : '',
+            hasPromotion: Boolean(lease.hasPromotion),
+            promoType: lease.promoType || 'ONE_MONTH_FREE',
+            promoDistribution: lease.promoDistribution || 'FIRST_MONTH',
+            promoTotalDiscount: lease.promoTotalDiscount || 0,
+            promoMonthlyDiscount: lease.promoMonthlyDiscount || 0,
+            promoDurationMonths: lease.promoDurationMonths || 0,
+            originalPromoDurationMonths: lease.promoDurationMonths || 0,
+            promoStartDate: lease.promoStartDate || '',
+            promoEndDate: lease.promoEndDate || ''
+        });
         setNewLockerRows([]);
         setLockerToEdit(null);
+
+        if (pId) {
+            fetchUnitsForEdit(pId);
+        } else {
+            setEditUnits([]);
+        }
+
+        if (uId) {
+            fetchBedroomsForEdit(uId);
+        } else {
+            setEditBedrooms([]);
+        }
+
         // Fetch existing locker rentals for this lease
         try {
             const res = await api.get(`/api/admin/leases/${lease.id}/lockers`);
@@ -319,7 +501,20 @@ export const LeaseHistory = () => {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-mono text-[13px]">{lease.term}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-700">${(lease.monthlyRent || 0).toLocaleString('en-CA')}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-700">
+                                            <div>${(lease.monthlyRent || 0).toLocaleString('en-CA')}</div>
+                                            {lease.hasPromotion && (
+                                                <div className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full mt-1">
+                                                    <Tag size={10} />
+                                                    <span>
+                                                        {lease.promoType === 'ONE_MONTH_FREE' ? '1 Mo Free' :
+                                                         lease.promoType === 'TWO_MONTHS_FREE' ? '2 Mos Free' :
+                                                         lease.promoType === 'CUSTOM_AMOUNT' ? `-$${(lease.promoTotalDiscount || 0).toLocaleString('en-CA')}` :
+                                                         'Promo'}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${lease.status.toLowerCase() === 'active'
                                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
@@ -493,6 +688,73 @@ export const LeaseHistory = () => {
                                         {selectedLease.status.charAt(0).toUpperCase() + selectedLease.status.slice(1).toLowerCase()}
                                     </span>
                                 </div>
+
+                                {selectedLease.hasPromotion && (
+                                    <div className="bg-emerald-50/70 rounded-xl p-4 border border-emerald-200 mt-3">
+                                        <div className="flex items-center justify-between gap-2 mb-3">
+                                            <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-sm">
+                                                <Tag size={16} className="text-emerald-600" />
+                                                <span>Promotional Rent Discount</span>
+                                            </div>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                                (selectedLease.promoEndDate && new Date() > new Date(selectedLease.promoEndDate + 'T23:59:59'))
+                                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                                    : 'bg-emerald-100 text-emerald-700'
+                                            }`}>
+                                                {(selectedLease.promoEndDate && new Date() > new Date(selectedLease.promoEndDate + 'T23:59:59')) ? 'Expired' : 'Applied'}
+                                            </span>
+                                        </div>
+                                        <div className="space-y-2 text-xs">
+                                            {selectedLease.promoEndDate && (
+                                                <div className="flex justify-between py-1 border-b border-emerald-100/60">
+                                                    <span className="text-slate-500 font-medium">Promotion Expiry</span>
+                                                    <span className="font-semibold text-slate-800 font-mono">
+                                                        {selectedLease.promoEndDate} ({selectedLease.promoDurationMonths || 12} mos term)
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div className="flex justify-between py-1 border-b border-emerald-100/60">
+                                                <span className="text-slate-500 font-medium">Original Monthly Rent</span>
+                                                <span className="font-semibold text-slate-900">${(selectedLease.monthlyRent || 0).toLocaleString('en-CA')}</span>
+                                            </div>
+                                            <div className="flex justify-between py-1 border-b border-emerald-100/60">
+                                                <span className="text-slate-500 font-medium">Promotional Offer</span>
+                                                <span className="font-bold text-emerald-800">
+                                                    {selectedLease.promoType === 'ONE_MONTH_FREE' ? '1 Month Free' :
+                                                     selectedLease.promoType === 'TWO_MONTHS_FREE' ? '2 Months Free' :
+                                                     selectedLease.promoType === 'CUSTOM_AMOUNT' ? `Custom ($${(selectedLease.promoTotalDiscount || 0).toLocaleString('en-CA')})` :
+                                                     selectedLease.promoType || 'Active Promotion'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between py-1 border-b border-emerald-100/60">
+                                                <span className="text-slate-500 font-medium">Total Discount Value</span>
+                                                <span className="font-bold text-emerald-700">${(selectedLease.promoTotalDiscount || 0).toLocaleString('en-CA')}</span>
+                                            </div>
+                                            <div className="flex justify-between py-1 border-b border-emerald-100/60">
+                                                <span className="text-slate-500 font-medium">Distribution Method</span>
+                                                <span className="font-semibold text-slate-800">
+                                                    {selectedLease.promoDistribution === 'DISTRIBUTED' ? 'Distributed Over Lease Term' : 'Free Rent Applied to First Month'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between py-1 border-b border-emerald-100/60">
+                                                <span className="text-slate-500 font-medium">Monthly Discount Amount</span>
+                                                <span className="font-bold text-emerald-600">
+                                                    {selectedLease.promoDistribution === 'DISTRIBUTED'
+                                                        ? `-$${(selectedLease.promoMonthlyDiscount || 0).toLocaleString('en-CA')}/month`
+                                                        : `-$${(selectedLease.promoTotalDiscount || 0).toLocaleString('en-CA')} (Month 1)`}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between py-1">
+                                                <span className="text-slate-500 font-medium">Promotional Period</span>
+                                                <span className="font-semibold text-slate-900">
+                                                    {selectedLease.promoDistribution === 'DISTRIBUTED'
+                                                        ? `Months 1–${selectedLease.promoDurationMonths || 12}`
+                                                        : selectedLease.promoType === 'TWO_MONTHS_FREE' ? 'Months 1–2 only' : 'Month 1 only'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                                 {selectedLease.lockers && selectedLease.lockers.length > 0 && (
                                     <div className="mt-4">
                                         <div className="flex items-center gap-2 mb-3">
@@ -537,10 +799,13 @@ export const LeaseHistory = () => {
 
                 {/* EDIT MODAL */}
                 {editLease && (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
-                        <form onSubmit={handleEditSave} className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-300">
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200 p-4">
+                        <form onSubmit={handleEditSave} className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-300">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-slate-900">Edit Lease</h3>
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900">Edit Lease</h3>
+                                    <p className="text-xs text-slate-400 mt-0.5">Update lease terms, property details, and occupants</p>
+                                </div>
                                 <button
                                     type="button"
                                     onClick={() => setEditLease(null)}
@@ -551,6 +816,152 @@ export const LeaseHistory = () => {
                             </div>
 
                             <div className="space-y-4 mb-8">
+                                {/* Building Selection */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Building</label>
+                                    <div className="relative">
+                                        <Home size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <select
+                                            value={editLease.propertyId || ''}
+                                            onChange={handleEditBuildingChange}
+                                            className="w-full pl-10 pr-10 py-2 rounded-lg border border-slate-200 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm appearance-none bg-white font-medium"
+                                        >
+                                            <option value="">Select Building</option>
+                                            {buildings.map(b => (
+                                                <option key={b.id} value={b.id}>{b.name}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Unit and Bedroom Selection */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-700">Unit</label>
+                                        <div className="relative">
+                                            <Home size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <select
+                                                value={editLease.unitId || ''}
+                                                onChange={handleEditUnitChange}
+                                                disabled={!editLease.propertyId}
+                                                className="w-full pl-10 pr-10 py-2 rounded-lg border border-slate-200 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm appearance-none bg-white font-medium disabled:opacity-50"
+                                            >
+                                                <option value="">Select Unit</option>
+                                                {editUnits.map(u => (
+                                                    <option key={u.id} value={u.id}>{u.unitNumber || u.name}</option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                <ChevronDown size={16} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-700">Bedroom (Optional)</label>
+                                        <div className="relative">
+                                            <Bed size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <select
+                                                value={editLease.bedroomId || ''}
+                                                onChange={(e) => setEditLease({ ...editLease, bedroomId: e.target.value })}
+                                                disabled={!editLease.unitId}
+                                                className="w-full pl-10 pr-10 py-2 rounded-lg border border-slate-200 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm appearance-none bg-white font-medium disabled:opacity-50"
+                                            >
+                                                <option value="">Full Unit (No specific room)</option>
+                                                {editBedrooms.map(b => (
+                                                    <option key={b.id} value={b.id}>{b.bedroomNumber || b.displayName}</option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                <ChevronDown size={16} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Primary Tenant */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Primary Tenant</label>
+                                    <div className="relative">
+                                        <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <select
+                                            value={editLease.tenantId || ''}
+                                            onChange={handleEditTenantChange}
+                                            className="w-full pl-10 pr-10 py-2 rounded-lg border border-slate-200 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm appearance-none bg-white font-medium"
+                                        >
+                                            <option value="">Select Primary Tenant</option>
+                                            {tenants.map(t => (
+                                                <option key={t.id} value={t.id}>{t.name} ({t.type || 'Individual'})</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
+                                    {editLease.tenantId && tenants.find(t => t.id.toString() === editLease.tenantId?.toString())?.type === 'RESIDENT' && (
+                                        <p className="text-xs font-semibold text-amber-600 mt-1 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100 flex items-center gap-1.5 w-fit">
+                                            <Shield size={12} />
+                                            Resident of: {tenants.find(t => t.id.toString() === editLease.tenantId?.toString())?.parentName || 'Unknown Parent'}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Co-Applicants / Occupants Multi-select */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Co-Applicants / Occupants (Optional)</label>
+                                    <div className="relative">
+                                        <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+                                            {(editLease.coTenantIds || []).map(id => {
+                                                const t = tenants.find(tenant => tenant.id.toString() === id.toString());
+                                                return (
+                                                    <span key={id} className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 border border-indigo-100 rounded-lg text-xs font-semibold text-indigo-700">
+                                                        {t ? t.name : `Tenant #${id}`}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditLease(prev => ({
+                                                                ...prev,
+                                                                coTenantIds: (prev.coTenantIds || []).filter(cid => cid.toString() !== id.toString())
+                                                            }))}
+                                                            className="hover:text-indigo-900 text-sm font-bold ml-1 leading-none"
+                                                        >
+                                                            &times;
+                                                        </button>
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className="relative">
+                                            <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <select
+                                                value=""
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val && !(editLease.coTenantIds || []).some(cid => cid.toString() === val.toString())) {
+                                                        setEditLease(prev => ({
+                                                            ...prev,
+                                                            coTenantIds: [...(prev.coTenantIds || []), val]
+                                                        }));
+                                                    }
+                                                }}
+                                                className="w-full pl-10 pr-10 py-2 rounded-lg border border-slate-200 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm appearance-none bg-slate-50/50 font-medium"
+                                            >
+                                                <option value="">Add Co-Tenant...</option>
+                                                {tenants
+                                                    .filter(t => t.id.toString() !== editLease.tenantId?.toString() && !(editLease.coTenantIds || []).some(cid => cid.toString() === t.id.toString()))
+                                                    .map(t => (
+                                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                                    ))}
+                                            </select>
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                <ChevronDown size={16} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400">Select additional tenants / occupants for this lease.</p>
+                                </div>
+
                                 {Boolean(editLease.companyName || editLease.tenantType === 'COMPANY') && (
                                     <div className="space-y-2 p-3 bg-purple-50/50 rounded-xl border border-purple-100">
                                         <div className="flex items-center justify-between">
@@ -630,18 +1041,200 @@ export const LeaseHistory = () => {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-700">Monthly Rent</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                                        <input
-                                            type="number"
-                                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm font-semibold"
-                                            value={editLease.monthlyRent}
-                                            onChange={(e) => setEditLease({ ...editLease, monthlyRent: e.target.value })}
-                                            required
-                                        />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-700">Monthly Rent</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                            <input
+                                                type="number"
+                                                className="w-full pl-8 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm font-semibold"
+                                                value={editLease.monthlyRent}
+                                                onChange={(e) => setEditLease({ ...editLease, monthlyRent: e.target.value })}
+                                                required
+                                            />
+                                        </div>
                                     </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-700">Security Deposit</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                            <input
+                                                type="number"
+                                                className="w-full pl-8 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm font-semibold"
+                                                value={editLease.securityDeposit || ''}
+                                                onChange={(e) => setEditLease({ ...editLease, securityDeposit: e.target.value })}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* PROMOTIONAL DISCOUNT SECTION */}
+                                <div className="border-t border-slate-100 pt-4 mt-2">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Tag size={16} className="text-emerald-600" />
+                                            <div>
+                                                <span className="text-sm font-bold text-slate-800">Promotional Rent Discount</span>
+                                                <p className="text-[11px] text-slate-400 m-0">Apply or update promotional rent discount</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditLease(prev => ({ ...prev, hasPromotion: false }))}
+                                                className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                                                    !editLease.hasPromotion ? 'bg-white text-slate-700 shadow-xs' : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                No
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditLease(prev => ({
+                                                    ...prev,
+                                                    hasPromotion: true,
+                                                    promoType: prev.promoType || 'ONE_MONTH_FREE',
+                                                    promoDistribution: prev.promoDistribution || 'FIRST_MONTH'
+                                                }))}
+                                                className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                                                    editLease.hasPromotion ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                Yes
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {editLease.hasPromotion && (() => {
+                                        const editBaseRent = parseFloat(editLease.monthlyRent) || 0;
+                                        const totalLeaseMonths = calculateDurationMonths(editLease.startDate, editLease.endDate);
+                                        const origDuration = parseInt(editLease.originalPromoDurationMonths) || 0;
+                                        const isExtended = origDuration > 0 && totalLeaseMonths > origDuration;
+                                        const editDurationMonths = isExtended ? origDuration : totalLeaseMonths;
+
+                                        let editCalculatedDiscount = 0;
+                                        if (editLease.promoType === 'ONE_MONTH_FREE') editCalculatedDiscount = editBaseRent;
+                                        else if (editLease.promoType === 'TWO_MONTHS_FREE') editCalculatedDiscount = editBaseRent * 2;
+                                        else if (editLease.promoType === 'CUSTOM_AMOUNT') editCalculatedDiscount = parseFloat(editLease.promoTotalDiscount) || 0;
+
+                                        let editMonthlyDiscount = 0;
+                                        if (editLease.promoDistribution === 'DISTRIBUTED') {
+                                            editMonthlyDiscount = editDurationMonths > 0 ? parseFloat((editCalculatedDiscount / editDurationMonths).toFixed(2)) : 0;
+                                        } else {
+                                            editMonthlyDiscount = editCalculatedDiscount;
+                                        }
+
+                                        return (
+                                            <div className="bg-emerald-50/60 rounded-xl p-3.5 border border-emerald-100 space-y-3">
+                                                {isExtended && (
+                                                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px]">
+                                                        <Shield size={14} className="text-amber-600 shrink-0" />
+                                                        <div>
+                                                            <span className="font-bold">Guardrail Active:</span> Lease extended to {totalLeaseMonths} mos. Promotional discount strictly expires after initial {origDuration} mos.
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block mb-1.5">Promotion Offer</label>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditLease(prev => ({ ...prev, promoType: 'ONE_MONTH_FREE' }))}
+                                                            className={`p-2 rounded-lg border text-left text-xs transition-all ${
+                                                                editLease.promoType === 'ONE_MONTH_FREE'
+                                                                    ? 'border-emerald-500 bg-white font-bold text-emerald-800 ring-2 ring-emerald-500/20'
+                                                                    : 'border-slate-200 bg-white/70 text-slate-700'
+                                                            }`}
+                                                        >
+                                                            1 Month Free
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditLease(prev => ({ ...prev, promoType: 'TWO_MONTHS_FREE' }))}
+                                                            className={`p-2 rounded-lg border text-left text-xs transition-all ${
+                                                                editLease.promoType === 'TWO_MONTHS_FREE'
+                                                                    ? 'border-emerald-500 bg-white font-bold text-emerald-800 ring-2 ring-emerald-500/20'
+                                                                    : 'border-slate-200 bg-white/70 text-slate-700'
+                                                            }`}
+                                                        >
+                                                            2 Months Free
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditLease(prev => ({ ...prev, promoType: 'CUSTOM_AMOUNT' }))}
+                                                            className={`p-2 rounded-lg border text-left text-xs transition-all ${
+                                                                editLease.promoType === 'CUSTOM_AMOUNT'
+                                                                    ? 'border-emerald-500 bg-white font-bold text-emerald-800 ring-2 ring-emerald-500/20'
+                                                                    : 'border-slate-200 bg-white/70 text-slate-700'
+                                                            }`}
+                                                        >
+                                                            Custom ($)
+                                                        </button>
+                                                    </div>
+
+                                                    {editLease.promoType === 'CUSTOM_AMOUNT' && (
+                                                        <div className="mt-2">
+                                                            <input
+                                                                type="number"
+                                                                placeholder="Custom discount amount"
+                                                                value={editLease.promoTotalDiscount || ''}
+                                                                onChange={(e) => setEditLease(prev => ({ ...prev, promoTotalDiscount: e.target.value }))}
+                                                                className="w-full px-3 py-1.5 text-xs rounded border border-slate-200 bg-white outline-none focus:border-emerald-500"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block mb-1.5">Distribution Method</label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditLease(prev => ({ ...prev, promoDistribution: 'FIRST_MONTH' }))}
+                                                            className={`p-2 rounded-lg border text-left text-xs transition-all ${
+                                                                editLease.promoDistribution === 'FIRST_MONTH'
+                                                                    ? 'border-emerald-500 bg-white font-bold text-emerald-800 ring-2 ring-emerald-500/20'
+                                                                    : 'border-slate-200 bg-white/70 text-slate-700'
+                                                            }`}
+                                                        >
+                                                            First Month Free
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditLease(prev => ({ ...prev, promoDistribution: 'DISTRIBUTED' }))}
+                                                            className={`p-2 rounded-lg border text-left text-xs transition-all ${
+                                                                editLease.promoDistribution === 'DISTRIBUTED'
+                                                                    ? 'border-emerald-500 bg-white font-bold text-emerald-800 ring-2 ring-emerald-500/20'
+                                                                    : 'border-slate-200 bg-white/70 text-slate-700'
+                                                            }`}
+                                                        >
+                                                            Distributed ({editDurationMonths} mos)
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white rounded-lg p-2.5 border border-emerald-200 text-[11px] space-y-1">
+                                                    <div className="flex justify-between text-slate-600">
+                                                        <span>Total Discount:</span>
+                                                        <span className="font-bold text-emerald-700">${editCalculatedDiscount.toLocaleString('en-CA')}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-slate-600">
+                                                        <span>Monthly Discount:</span>
+                                                        <span className="font-bold text-emerald-700">
+                                                            {editLease.promoDistribution === 'DISTRIBUTED'
+                                                                ? `-$${editMonthlyDiscount.toLocaleString('en-CA')}/mo`
+                                                                : `-$${editCalculatedDiscount.toLocaleString('en-CA')} (Month 1)`}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400 italic pt-1 border-t border-slate-100">
+                                                        * Updating promotional parameters applies to future invoices only. Past invoices remain unchanged.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* LOCKER SECTION (Req 11) */}
