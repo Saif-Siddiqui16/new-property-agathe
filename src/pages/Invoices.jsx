@@ -153,6 +153,7 @@ export const Invoices = () => {
                 unitName: selectedTenant.unit,
                 month: defaultMonth,
                 rent: (selectedTenant.rentAmount || 0).toString(),
+                discount: (selectedTenant.promoMonthlyDiscount || 0).toString(),
             }));
         }
     };
@@ -1179,13 +1180,28 @@ export const Invoices = () => {
                                     </div>
                                 </div>
 
+                                {parseFloat(form.discount || 0) > 0 && form.category === 'RENT' && (
+                                    <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-850 text-xs font-semibold">
+                                        <span className="flex items-center gap-1.5 text-emerald-800">
+                                            <span>Promotional Discount:</span>
+                                        </span>
+                                        <span className="font-mono font-bold text-sm text-emerald-600">
+                                            -$ {parseFloat(form.discount).toLocaleString('en-CA', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                )}
+
                                 <div className="bg-indigo-600 rounded-2xl p-5 text-white shadow-xl shadow-indigo-100 flex justify-between items-center">
                                     <div className="space-y-0.5">
                                         <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-80">Total Calculation</p>
-                                        <p className="text-xs font-semibold opacity-60">Rent + Service Fees</p>
+                                        <p className="text-xs font-semibold opacity-60">
+                                            {parseFloat(form.discount || 0) > 0 && form.category === 'RENT' ? 'Rent - Discount + Service Fees' : 'Rent + Service Fees'}
+                                        </p>
                                     </div>
                                     <div className="text-right">
-                                        <span className="text-2xl font-black tracking-tighter">$ {((parseFloat(form.rent) || 0) + (parseFloat(form.serviceFees) || 0)).toLocaleString('en-CA')}</span>
+                                        <span className="text-2xl font-black tracking-tighter">
+                                            $ {Math.max(0, (parseFloat(form.rent) || 0) - (form.category === 'RENT' ? (parseFloat(form.discount) || 0) : 0) + (parseFloat(form.serviceFees) || 0)).toLocaleString('en-CA', { minimumFractionDigits: 2 })}
+                                        </span>
                                     </div>
                                 </div>
 
