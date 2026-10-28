@@ -24,6 +24,8 @@ export const Invoices = () => {
     const [paymentStatus, setPaymentStatus] = useState('idle'); // idle, processing, success
     const [editInvoice, setEditInvoice] = useState(null);
     const [isBatchRunning, setIsBatchRunning] = useState(false);
+    const [showBatchModal, setShowBatchModal] = useState(false);
+    const [batchMonth, setBatchMonth] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [settings, setSettings] = useState({});
     
@@ -158,16 +160,35 @@ export const Invoices = () => {
         }
     };
 
-    const handleBatchInvoicing = async () => {
-        if (!window.confirm('Run batch invoicing for all active leases for the current month?')) return;
+    const getUpcomingMonths = () => {
+        const list = [];
+        const now = new Date();
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(Date.UTC(now.getFullYear(), now.getMonth() + i, 15, 12, 0, 0));
+            const val = d.toLocaleString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
+            list.push(val);
+        }
+        return list;
+    };
+
+    const handleOpenBatchModal = () => {
+        const upcoming = getUpcomingMonths();
+        const defaultSelection = upcoming[1] || upcoming[0] || '';
+        setBatchMonth(defaultSelection);
+        setShowBatchModal(true);
+    };
+
+    const handleRunBatchInvoicing = async () => {
+        if (!batchMonth) return alert('Please select a billing month');
         setIsBatchRunning(true);
         try {
-            const res = await api.post('/api/admin/invoices/batch');
-            alert(`Batch complete! Created: ${res.data.createdCount}, Skipped: ${res.data.skippedCount}`);
+            const res = await api.post('/api/admin/invoices/batch', { month: batchMonth });
+            setShowBatchModal(false);
+            alert(`Batch Invoicing for ${batchMonth} Complete!\nCreated: ${res.data.createdCount}, Skipped: ${res.data.skippedCount}`);
             fetchInvoices();
         } catch (e) {
             console.error(e);
-            alert('Batch run failed');
+            alert(e.response?.data?.message || 'Batch run failed');
         } finally {
             setIsBatchRunning(false);
         }
@@ -508,7 +529,7 @@ export const Invoices = () => {
                     {hasPermission('Invoices', 'add') && (
                         <Button
                             variant="secondary"
-                            onClick={handleBatchInvoicing}
+                            onClick={handleOpenBatchModal}
                             disabled={isBatchRunning}
                             className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                         >
@@ -1336,6 +1357,74 @@ export const Invoices = () => {
                                     </Button>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {showBatchModal && (
+                    <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[110] backdrop-blur-md animate-in fade-in duration-300 px-4">
+                        <div className="bg-white rounded-3xl w-full max-w-md shadow-[0_20px_50px_rgba(0,0,0,0.2)] animate-in zoom-in-95 duration-300 flex flex-col p-6 border border-slate-200">
+                            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                        <CreditCard size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-800">Run Batch Invoicing</h3>
+                                        <p className="text-xs text-slate-500">Generate rent invoices for all active leases</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => setShowBatchModal(false)} 
+                                    disabled={isBatchRunning}
+                                    className="p-1.5 rounded-lg hover:bg-slate-200 transition-colors text-slate-400 border border-transparent"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="my-4">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                                    Select Billing Month
+                                </label>
+                                <select
+                                    value={batchMonth}
+                                    onChange={(e) => setBatchMonth(e.target.value)}
+                                    disabled={isBatchRunning}
+                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-all cursor-pointer"
+                                >
+                                    {getUpcomingMonths().map(m => (
+                                        <option key={m} value={m}>
+                                            {m}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 mt-6 pt-3 border-t border-slate-100">
+                                <Button 
+                                    variant="secondary" 
+                                    onClick={() => setShowBatchModal(false)} 
+                                    disabled={isBatchRunning}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button 
+                                    variant="primary" 
+                                    onClick={handleRunBatchInvoicing} 
+                                    disabled={isBatchRunning || !batchMonth}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[140px]"
+                                >
+                                    {isBatchRunning ? (
+                                        <>
+                                            <Loader2 size={16} className="mr-2 animate-spin" />
+                                            Generating...
+                                        </>
+                                    ) : (
+                                        'Generate Invoices'
+                                    )}
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 )}
