@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { MainLayout } from '../layouts/MainLayout';
 import { Eye, Trash2, CheckCircle, X, CreditCard, Wallet, Banknote, Loader2, Plus, Edit2, Send, Download, ChevronDown } from 'lucide-react';
 import { Button } from '../components/Button';
@@ -160,6 +160,31 @@ export const Invoices = () => {
         }
     };
 
+    const getActiveLockersForMonth = (lockers, monthStr) => {
+        if (!Array.isArray(lockers) || !monthStr) return [];
+        const parsedDate = new Date(monthStr + ' 1');
+        if (isNaN(parsedDate.getTime())) return [];
+
+        const monthStart = new Date(Date.UTC(parsedDate.getFullYear(), parsedDate.getMonth(), 1, 0, 0, 0));
+        const monthEnd = new Date(Date.UTC(parsedDate.getFullYear(), parsedDate.getMonth() + 1, 0, 23, 59, 59));
+
+        return lockers.filter(lr => {
+            const s = new Date(lr.startDate);
+            const e = new Date(lr.endDate);
+            return !(e < monthStart || s > monthEnd);
+        });
+    };
+
+    const currentSelectedTenant = tenants.find(t => t.id === parseInt(form.tenantId));
+    const activeLockers = useMemo(() => {
+        if (!currentSelectedTenant?.lockers || !form.month) return [];
+        return getActiveLockersForMonth(currentSelectedTenant.lockers, form.month);
+    }, [currentSelectedTenant, form.month]);
+
+    const activeLockerTotal = useMemo(() => {
+        return activeLockers.reduce((sum, l) => sum + (parseFloat(l.rentAmount) || 0), 0);
+    }, [activeLockers]);
+
     const getUpcomingMonths = () => {
         const list = [];
         const now = new Date();
@@ -223,13 +248,22 @@ export const Invoices = () => {
         if (e) e.preventDefault();
 
         try {
+            const lockerLineItems = (form.category === 'RENT' && activeLockers.length > 0)
+                ? activeLockers.map(lr => ({
+                    description: `Locker - ${lr.locker?.property?.name || 'Locker'} / ${lr.locker?.lockerNumber || ''}`,
+                    amount: parseFloat(lr.rentAmount) || 0
+                }))
+                : [];
+
             const payload = {
                 month: form.month,
                 rent: form.category === 'RENT' ? form.rent : 0,
-                serviceFees: (form.category === 'SERVICE' || form.category === 'SECURITY_DEPOSIT') ? form.serviceFees : 0,
+                serviceFees: (form.category === 'SERVICE' || form.category === 'SECURITY_DEPOSIT') ? form.serviceFees : (activeLockerTotal > 0 ? activeLockerTotal : 0),
                 category: form.category,
                 description: form.description,
-                items: form.category === 'SERVICE' ? lineItems.filter(item => item.description && item.amount) : []
+                items: form.category === 'SERVICE' 
+                    ? lineItems.filter(item => item.description && item.amount) 
+                    : lockerLineItems
             };
 
             if (forcedStatus) payload.status = forcedStatus;
@@ -822,25 +856,31 @@ export const Invoices = () => {
                                                 </div>
                                             )}
 
-                                            {viewInvoice.category === 'SERVICE' && viewInvoice.items && viewInvoice.items.length > 0 ? (
+                                            {viewInvoice.items && viewInvoice.items.length > 0 ? (
                                                 viewInvoice.items
                                                     .filter(item => !item.description?.toLowerCase().includes('promotional discount'))
                                                     .map((item, idx) => (
                                                         <div key={idx} className="px-6 py-4 flex items-center justify-between border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                                                             <div>
                                                                 <p className="font-bold text-slate-800">{item.description}</p>
-                                                                <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Service Item</p>
+                                                                <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">
+                                                                    {item.description?.toLowerCase().includes('locker') ? 'Locker Fee' : 'Service Item'}
+                                                                </p>
                                                             </div>
-                                                            <span className="font-bold text-slate-700 font-mono italic">$ {(parseFloat(item.amount) || 0).toLocaleString('en-CA')}</span>
+                                                            <span className="font-bold text-slate-700 font-mono italic">$ {(parseFloat(item.amount) || 0).toLocaleString('en-CA', { minimumFractionDigits: 2 })}</span>
                                                         </div>
                                                     ))
                                             ) : (viewInvoice.serviceFees || 0) > 0 && (
                                                 <div className="px-6 py-4 flex items-center justify-between border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                                                     <div>
-                                                        <p className="font-bold text-slate-800">Common Area Service Fees</p>
-                                                        <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Maintenance & Amenities</p>
+                                                        <p className="font-bold text-slate-800">
+                                                            {viewInvoice.category === 'RENT' ? 'Locker & Service Fees' : 'Common Area Service Fees'}
+                                                        </p>
+                                                        <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">
+                                                            {viewInvoice.category === 'RENT' ? 'Lease Add-on' : 'Maintenance & Amenities'}
+                                                        </p>
                                                     </div>
-                                                    <span className="font-bold text-slate-700 font-mono italic">$ {(viewInvoice.serviceFees || 0).toLocaleString('en-CA')}</span>
+                                                    <span className="font-bold text-slate-700 font-mono italic">$ {(parseFloat(viewInvoice.serviceFees) || 0).toLocaleString('en-CA', { minimumFractionDigits: 2 })}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -860,16 +900,32 @@ export const Invoices = () => {
                                                     </div>
                                                     {(viewInvoice.serviceFees || 0) > 0 && (
                                                         <div className="flex justify-between items-center text-sm px-2">
-                                                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Service Fees</span>
+                                                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                                                                {viewInvoice.category === 'RENT' ? 'Lockers / Fees' : 'Service Fees'}
+                                                            </span>
                                                             <span className="font-bold text-slate-600 font-mono italic">$ {(viewInvoice.serviceFees || 0).toLocaleString('en-CA')}</span>
                                                         </div>
                                                     )}
                                                 </>
                                             ) : (
-                                                <div className="flex justify-between items-center text-sm px-2">
-                                                    <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Subtotal</span>
-                                                    <span className="font-bold text-slate-600 font-mono italic">$ {(viewInvoice.amount || 0).toLocaleString('en-CA')}</span>
-                                                </div>
+                                                <>
+                                                    {(viewInvoice.category === 'RENT' && (viewInvoice.serviceFees || 0) > 0) && (
+                                                        <>
+                                                            <div className="flex justify-between items-center text-sm px-2">
+                                                                <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Base Rent</span>
+                                                                <span className="font-bold text-slate-600 font-mono italic">$ {(viewInvoice.rent || 0).toLocaleString('en-CA')}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-sm px-2">
+                                                                <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Lockers / Fees</span>
+                                                                <span className="font-bold text-slate-600 font-mono italic">+$ {(viewInvoice.serviceFees || 0).toLocaleString('en-CA')}</span>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                    <div className="flex justify-between items-center text-sm px-2">
+                                                        <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Subtotal</span>
+                                                        <span className="font-bold text-slate-600 font-mono italic">$ {(viewInvoice.amount || 0).toLocaleString('en-CA')}</span>
+                                                    </div>
+                                                </>
                                             )}
                                             <div className="flex justify-between items-center text-sm px-2">
                                                 <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Taxes (0%)</span>
@@ -1212,16 +1268,40 @@ export const Invoices = () => {
                                     </div>
                                 )}
 
+                                {activeLockers.length > 0 && form.category === 'RENT' && (
+                                    <div className="p-3 bg-indigo-50/70 border border-indigo-200/80 rounded-xl space-y-1.5 animate-in fade-in">
+                                        <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-indigo-700">
+                                            <span>Assigned Lockers</span>
+                                            <span className="font-mono font-bold">+ $ {activeLockerTotal.toLocaleString('en-CA', { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                        {activeLockers.map((lr, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-xs text-slate-700 font-medium">
+                                                <span className="flex items-center gap-1.5">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                                    <span>{lr.locker?.lockerNumber ? `Locker ${lr.locker.lockerNumber}` : 'Locker'}{lr.locker?.property?.name ? ` (${lr.locker.property.name})` : ''}</span>
+                                                </span>
+                                                <span className="font-mono font-bold text-indigo-600">
+                                                    +$ {(parseFloat(lr.rentAmount) || 0).toLocaleString('en-CA', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
                                 <div className="bg-indigo-600 rounded-2xl p-5 text-white shadow-xl shadow-indigo-100 flex justify-between items-center">
                                     <div className="space-y-0.5">
                                         <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-80">Total Calculation</p>
                                         <p className="text-xs font-semibold opacity-60">
-                                            {parseFloat(form.discount || 0) > 0 && form.category === 'RENT' ? 'Rent - Discount + Service Fees' : 'Rent + Service Fees'}
+                                            {form.category === 'RENT'
+                                                ? (activeLockers.length > 0
+                                                    ? `Rent + Lockers${parseFloat(form.discount || 0) > 0 ? ' - Discount' : ''}`
+                                                    : (parseFloat(form.discount || 0) > 0 ? 'Rent - Discount' : 'Base Rent'))
+                                                : 'Service Fees'}
                                         </p>
                                     </div>
                                     <div className="text-right">
                                         <span className="text-2xl font-black tracking-tighter">
-                                            $ {Math.max(0, (parseFloat(form.rent) || 0) - (form.category === 'RENT' ? (parseFloat(form.discount) || 0) : 0) + (parseFloat(form.serviceFees) || 0)).toLocaleString('en-CA', { minimumFractionDigits: 2 })}
+                                            $ {Math.max(0, (parseFloat(form.rent) || 0) - (form.category === 'RENT' ? (parseFloat(form.discount) || 0) : 0) + (form.category === 'RENT' ? activeLockerTotal : 0) + (parseFloat(form.serviceFees) || 0)).toLocaleString('en-CA', { minimumFractionDigits: 2 })}
                                         </span>
                                     </div>
                                 </div>
