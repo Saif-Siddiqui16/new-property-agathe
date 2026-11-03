@@ -258,7 +258,7 @@ export const Invoices = () => {
             const payload = {
                 month: form.month,
                 rent: form.category === 'RENT' ? form.rent : 0,
-                serviceFees: (form.category === 'SERVICE' || form.category === 'SECURITY_DEPOSIT') ? form.serviceFees : (activeLockerTotal > 0 ? activeLockerTotal : 0),
+                serviceFees: (form.category === 'SERVICE' || form.category === 'SECURITY_DEPOSIT') ? form.serviceFees : 0,
                 category: form.category,
                 description: form.description,
                 items: form.category === 'SERVICE' 
